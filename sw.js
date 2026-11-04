@@ -1,10 +1,12 @@
-/* Blutdruck – Service Worker für Offline-Betrieb.
+/* Blutdruck Pro – Service Worker für Offline-Betrieb.
    Wird vom Browser automatisch genutzt; nicht manuell öffnen.
    Strategie: network-first (online immer aktuell, offline aus dem Cache).
    WICHTIG (v22): Der Netzwerk-Abruf revalidiert (cache:'no-cache'), sonst kann der Browser innerhalb
    seiner Cache-Frist eine ALTE Datei als „frisch" durchreichen → neues index.html, aber altes
    app.js/styles.css (kaputte/tote Knöpfe nach einem Update). Siehe fetch unten. */
-const CACHE = 'blutdruck-v23';
+// Eigenes Präfix: Unter izblu.github.io liegen auch andere Apps, deren Offline-Speicher bleiben unangetastet.
+const CACHE_PREFIX = 'blutdruck-pro-';
+const CACHE = CACHE_PREFIX + 'v1';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './fonts/hanken-grotesk.woff2'];
 
 self.addEventListener('install', e => {
@@ -14,7 +16,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(CACHE_PREFIX) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

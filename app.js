@@ -1,6 +1,6 @@
 "use strict";
 /* =========================================================
-   Blutdruck-App – alles in einer Datei
+   Blutdruck Pro – alles in einer Datei
    Abschnitte: Utils · Speicherung · Parser · Erfassen ·
    Tabelle · Diagramm · Export/Import · App-Steuerung · PWA
    ========================================================= */
@@ -115,14 +115,14 @@ function askConfirm(opts){
 }
 
 /* ---------- Speicherung ---------- */
-const LS_KEY='bp_entries', LS_SET='bp_settings';
+const LS_KEY='bpp_entries', LS_SET='bpp_settings';
 const SET_DEFAULT={colorDots:true,guideLines:true,theme:'auto',accent:'kobalt',
   reminderDays:3,firstDirtyAt:null,snoozeUntil:0,
   thr:{sysY:130,sysR:140,diaY:85,diaR:90}};
 
 /* IndexedDB ist der robuste Hauptspeicher (überlebt Speicherdruck/ITP deutlich besser
    als localStorage und fasst viel mehr Daten). localStorage bleibt als Spiegel/Fallback. */
-const DB_NAME='blutdruck', DB_VER=1, STORE_E='entries', STORE_M='meta';
+const DB_NAME='blutdruck-pro', DB_VER=1, STORE_E='entries', STORE_M='meta';
 let _db=null;
 function openDB(){
   return new Promise((res,rej)=>{
@@ -1021,7 +1021,7 @@ function exportCSV(){
 // Backup-Datei: Inhalt bleibt JSON (JSON.stringify), aber Endung .txt und Typ text/plain –
 // einheitlich für alle Backup-Wege und nötig fürs Teilen auf Android (Chrome lehnt .json beim
 // share() ab). Wiederherstellen liest per JSON.parse, die Datei-Endung spielt dabei keine Rolle.
-function backupName(){ return `blutdruck-backup-${stampDateTime()}.txt`; }
+function backupName(){ return `blutdruck-pro-backup-${stampDateTime()}.txt`; }
 const BACKUP_VER=2;
 /* Nur die „Vorlieben" sichern – geräte-interne Erinnerungs-Merker (firstDirtyAt/snoozeUntil) bleiben außen vor. */
 function backupSettings(){ const {colorDots,guideLines,theme,accent,reminderDays,thr}=settings; return {colorDots,guideLines,theme,accent,reminderDays,thr}; }
@@ -1082,7 +1082,7 @@ async function createBackupFile(){
   if(!FS_SUPPORTED){ toast('Auf diesem Gerät nicht verfügbar','notice'); return; }
   try{
     const handle=await window.showSaveFilePicker({
-      suggestedName:'blutdruck-backup.txt',
+      suggestedName:'blutdruck-pro-backup.txt',
       types:[{description:'Textdatei',accept:{'text/plain':['.txt']}}]
     });
     await idbSetMeta('backupHandle',handle);
@@ -1511,7 +1511,7 @@ function rpDonut(rep,size,sw){
 function rpFoot(rep,pageLabel,opt){
   const t=settings.thr;
   const tod=(opt&&opt.noTod)?'':`<div><b style="color:${RP.ink}">Tageszeit: </b>morgens vor 11 Uhr · tagsüber 11–17 Uhr · abends ab 17 Uhr.</div>`;
-  return `<div style="margin-top:auto;padding-top:18px;border-top:1px solid ${RP.line};font-size:10.5px;line-height:1.5;color:${RP.muted};display:flex;justify-content:space-between;gap:16px"><div style="max-width:592px;display:flex;flex-direction:column;gap:4px"><div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>erhöht ab ${t.sysY}/${t.diaY}, zu hoch ab ${t.sysR}/${t.diaR} mmHg.</div>${tod}<div>Rein beschreibende Auswertung der erfassten Werte — keine ärztliche Bewertung oder Diagnose.</div></div><div style="text-align:right;white-space:nowrap">Blutdruck-App<br>${pageLabel||'Seite 1'}</div></div>`;
+  return `<div style="margin-top:auto;padding-top:18px;border-top:1px solid ${RP.line};font-size:10.5px;line-height:1.5;color:${RP.muted};display:flex;justify-content:space-between;gap:16px"><div style="max-width:592px;display:flex;flex-direction:column;gap:4px"><div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>erhöht ab ${t.sysY}/${t.diaY}, zu hoch ab ${t.sysR}/${t.diaR} mmHg.</div>${tod}<div>Rein beschreibende Auswertung der erfassten Werte — keine ärztliche Bewertung oder Diagnose.</div></div><div style="text-align:right;white-space:nowrap">Blutdruck Pro<br>${pageLabel||'Seite 1'}</div></div>`;
 }
 
 /* ---- druck-optimierte Grafik (zeit-proportionale X-Achse; detailed = Wert je Punkt, Seite 2) ---- */
