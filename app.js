@@ -2158,10 +2158,16 @@ window.addEventListener('resize',()=>{ setNavH(); if(currentTab==='table') posit
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(currentTab==='chart') renderChart(); });
 
 /* ---------- PWA: Manifest + Icon + Service Worker ---------- */
-const SVG_ICON='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'+
-  '<rect width="512" height="512" rx="104" fill="#2563eb"/>'+
-  '<path d="M76 270h82l38-104 58 196 46-128 30 72h86" fill="none" stroke="#ffffff" '+
-  'stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* App-Icon 7a (Entscheidung 2026-11-06): Nachtblau, Puls-Zacke, schmale weiße PRO-Pille.
+   Dieselbe Zeichnung liegt als PNG vor (icon-192/512, icon-maskable-192/512, apple-touch-icon). */
+const SVG_ICON='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" aria-hidden="true">'+
+  '<rect width="180" height="180" rx="40" fill="#131a26"/>'+
+  '<polyline points="22,108 50,108 66,62 84,148 98,96 110,114 132,114" fill="none" stroke="#ffffff" '+
+  'stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>'+
+  '<rect x="92" y="24" width="66" height="32" rx="16" fill="#ffffff"/>'+
+  '<path d="M104 47V33h4a4 4 0 0 1 0 8h-4M120 47V33h4a4 4 0 0 1 0 8h-4M124 41l4 6" fill="none" '+
+  'stroke="#131a26" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'+
+  '<rect x="136" y="32.5" width="10" height="15" rx="5" fill="none" stroke="#131a26" stroke-width="4.5"/></svg>';
 function injectPWA(){
   $('#logo').innerHTML=SVG_ICON;   // Header-Logo bleibt scharfes Inline-SVG
   // Manifest + Icons sind jetzt echte Dateien im <head> (manifest.webmanifest, icon-192/512.png),

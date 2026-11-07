@@ -6,8 +6,8 @@
    app.js/styles.css (kaputte/tote Knöpfe nach einem Update). Siehe fetch unten. */
 // Eigenes Präfix: Unter izblu.github.io liegen auch andere Apps, deren Offline-Speicher bleiben unangetastet.
 const CACHE_PREFIX = 'blutdruck-pro-';
-const CACHE = CACHE_PREFIX + 'v3';
-const ASSETS = ['./', './index.html', './styles.css', './vitals.js', './app.js','./manifest.webmanifest', './icon-192.png', './icon-512.png', './fonts/hanken-grotesk.woff2'];
+const CACHE = CACHE_PREFIX + 'v4';
+const ASSETS = ['./', './index.html', './styles.css', './vitals.js', './app.js','./manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png', './apple-touch-icon.png', './fonts/hanken-grotesk.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
