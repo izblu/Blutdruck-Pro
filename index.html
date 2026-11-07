@@ -274,20 +274,39 @@
   </div>
 </div>
 
-<!-- Menu / settings dialog -->
+<!-- Menü (Bottom-Sheet, Aussehen A „Verfeinert"): jeder Abschnitt eine Karte mit Stand-Zeile,
+     Reihenfolge Backup · Daten · Zielbereich · Anzeige · Anleitung. Immer nur ein Abschnitt offen. -->
 <dialog id="menuDlg">
   <div class="dlg-grab" aria-hidden="true"></div>
   <div class="dlg-head">Menü</div>
   <div class="dlg-body">
-    <div class="acc-sec">
+
+    <!-- ===== Backup ===== -->
+    <div class="acc-sec" data-sec="backup">
     <button class="acc-head" type="button" aria-expanded="false" aria-controls="accData">
-      <span class="lbl"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V6z"/></svg>Backup</span>
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V6z"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">Backup</span><span class="acc-s acc-s-bk" id="sumBackup"></span></span>
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <div class="acc-body" id="accData">
+      <!-- Stand + Erinnerung (hängen am selben Merker settings.firstDirtyAt / settings.reminderDays) -->
+      <div class="grp-card bk-card">
+        <div class="bk-st" role="status">
+          <span class="bk-st-ic" id="bkStIc" aria-hidden="true"></span>
+          <span class="bk-st-txt"><span class="bk-st-t" id="bkStT"></span><span class="bk-st-s" id="bkStS"></span></span>
+        </div>
+        <div class="bk-rem">
+          <span class="bk-rem-l" id="remLbl">Erinnerung</span>
+          <div class="stepper" role="group" aria-labelledby="remLbl">
+            <button class="step-btn" id="remMinus" type="button" aria-label="Einen Tag früher"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></span></button>
+            <span class="step-val" id="remVal" aria-live="polite"></span>
+            <button class="step-btn" id="remPlus" type="button" aria-label="Einen Tag später"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span></button>
+          </div>
+        </div>
+      </div>
+
       <div class="grp-card">
         <div class="grp-head">Automatisches Backup</div>
-        <small class="reason" id="mLinkFileReason" hidden></small>
         <div class="lf-box" id="linkFileBox">
           <small class="reason" id="linkFileName"></small>
           <div class="lf-actions">
@@ -295,6 +314,9 @@
             <button class="lf-btn" id="lfBtn2" type="button"></button>
           </div>
         </div>
+        <p class="m-warn" id="fsWarn" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg>
+          <span>Diese Datei nie zusätzlich in der alten Blutdruck-App verknüpfen. Sie würde die Datei ohne Temperatur und Sauerstoff überschreiben.</span></p>
       </div>
 
       <div class="grp-card">
@@ -303,13 +325,11 @@
           <button class="lf-btn" id="mExportJson" type="button">Speichern</button>
           <button class="lf-btn" id="mImport" type="button">Wiederherstellen</button>
         </div>
-        <div class="switch" id="reminderRow">
-          <span>Erinnerung</span>
-          <span class="rem-int"><span>alle</span><input type="number" inputmode="numeric" min="0" id="setReminderDays"><span>Tage</span></span>
-        </div>
-        <p class="hint" id="reminderHint">Erinnert dich, wenn es seit so vielen Tagen ungesicherte Änderungen gibt. 0 = aus.</p>
       </div>
 
+      <p class="m-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/></svg>
+        <span>Gespeicherte Backups liegen auf diesem Handy. Sicher vor Verlust sind sie erst an einem zweiten Ort, zum Beispiel in einer Cloud oder per Mail.</span></p>
       <button class="share-btn" id="mShare" type="button">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
         Backup teilen</button>
@@ -317,9 +337,11 @@
     </div>
     </div>
 
-    <div class="acc-sec">
+    <!-- ===== Daten ===== -->
+    <div class="acc-sec" data-sec="data">
     <button class="acc-head" type="button" aria-expanded="false" aria-controls="accManage">
-      <span class="lbl"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Daten</span>
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">Daten</span><span class="acc-s" id="sumData"></span></span>
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <div class="acc-body" id="accManage">
@@ -341,70 +363,236 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg>
         <span>Alle Daten löschen</span>
       </button>
-      <p class="hint" id="storageStatus" hidden></p>
+      <p class="hint m-store" id="storageStatus" hidden></p>
     </div>
     </div>
-    <div class="acc-sec">
+
+    <!-- ===== Zielbereich (eigener Abschnitt): Ampel-Leisten mit 9 Grenzen, gebaut von renderThrBars() ===== -->
+    <div class="acc-sec" data-sec="target">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="accTarget">
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">Zielbereich</span><span class="acc-s" id="sumTarget"></span></span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="acc-body" id="accTarget">
+      <div class="grp-card thr-card">
+        <div class="thr-rows" id="thrBars"></div>
+        <p class="thr-note">Jede Zahl zählt schon zum Bereich rechts davon: 37,5 °C gilt als „Erhöht“. Die Standardwerte sind gängige Richtwerte.</p>
+        <button class="btn-text thr-reset" id="thrReset" type="button">Standardwerte wiederherstellen</button>
+      </div>
+    </div>
+    </div>
+
+    <!-- ===== Anzeige: Design + Neue Messung (Plus-Button) ===== -->
+    <div class="acc-sec" data-sec="view">
     <button class="acc-head" type="button" aria-expanded="false" aria-controls="accView">
-      <span class="lbl"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M2 14h4M10 8h4M18 16h4"/></svg>Anzeige</span>
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M2 14h4M10 8h4M18 16h4"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">Anzeige</span><span class="acc-s" id="sumView"></span></span>
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <div class="acc-body" id="accView">
-    <!-- Zielbereich: Schwellenwerte editierbar als Ampel-Chips (Gelb = „Erhöht ab", Rot = „Zu hoch ab") -->
-    <div class="mblk" id="thrBlock">
-      <div class="mblk-t">Zielbereich</div>
-      <div class="thr-grid2">
-        <span></span>
-        <span class="thr-hcol thr-hy">Erhöht ab</span>
-        <span class="thr-hcol thr-hr">Zu hoch ab</span>
-        <span class="thr-name">Systolisch</span>
-        <input class="thr-chip thr-chip-y" type="number" inputmode="numeric" id="thrSysY" aria-label="Systolisch: erhöht ab">
-        <input class="thr-chip thr-chip-r" type="number" inputmode="numeric" id="thrSysR" aria-label="Systolisch: zu hoch ab">
-        <span class="thr-name">Diastolisch</span>
-        <input class="thr-chip thr-chip-y" type="number" inputmode="numeric" id="thrDiaY" aria-label="Diastolisch: erhöht ab">
-        <input class="thr-chip thr-chip-r" type="number" inputmode="numeric" id="thrDiaR" aria-label="Diastolisch: zu hoch ab">
+      <div class="mblk">
+        <div class="mblk-t">Design</div>
+        <div class="theme-pill" id="themeSeg" role="group" aria-label="Darstellung">
+          <button type="button" class="tp-btn" data-theme="light">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Hell</button>
+          <button type="button" class="tp-btn" data-theme="dark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Dunkel</button>
+          <button type="button" class="tp-btn" data-theme="auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>Auto</button>
+        </div>
+        <div class="acc-swatches" id="accentPick" role="group" aria-label="Akzentfarbe"></div>
       </div>
-      <button class="btn-text thr-reset" id="thrReset" type="button">Standardwerte wiederherstellen</button>
-    </div>
-    <!-- Design: Hell/Dunkel/Auto + Akzentfarbe -->
-    <div class="mblk">
-      <div class="mblk-t">Design</div>
-      <div class="theme-pill" id="themeSeg" role="group" aria-label="Darstellung">
-        <button type="button" class="tp-btn" data-theme="light">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Hell</button>
-        <button type="button" class="tp-btn" data-theme="dark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Dunkel</button>
-        <button type="button" class="tp-btn" data-theme="auto">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>Auto</button>
+      <div class="mblk">
+        <div class="mblk-t" id="plusPickT">Neue Messung (Plus-Button)</div>
+        <div class="plus-pick" id="plusPick" role="group" aria-labelledby="plusPickT">
+          <button type="button" class="pp-opt" data-plus="a" aria-pressed="false">
+            <svg class="pp-mini" viewBox="0 0 34 46" aria-hidden="true">
+              <rect x="1" y="1" width="32" height="44" rx="6" fill="var(--surf2)" stroke="var(--line)" stroke-width="1.5"/>
+              <rect x="4" y="17" width="26" height="25" rx="4" fill="var(--surf)" stroke="var(--line)" stroke-width="1"/>
+              <rect x="7.5" y="21" width="5" height="5" rx="1.5" fill="var(--accent)"/><path d="M15.5 23.5h11" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"/>
+              <rect x="7.5" y="27.5" width="5" height="5" rx="1.5" fill="var(--accent)"/><path d="M15.5 30h9" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"/>
+              <rect x="7.5" y="34" width="5" height="5" rx="1.5" fill="var(--accent)"/><path d="M15.5 36.5h10" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="pp-txt"><b>Erst wählen</b><span>Nach dem + wählst du, was du misst.</span></span>
+            <span class="pp-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          </button>
+          <button type="button" class="pp-opt" data-plus="b" aria-pressed="false">
+            <svg class="pp-mini" viewBox="0 0 34 46" aria-hidden="true">
+              <rect x="1" y="1" width="32" height="44" rx="6" fill="var(--surf2)" stroke="var(--line)" stroke-width="1.5"/>
+              <rect x="5" y="6" width="24" height="6" rx="3" fill="var(--muted)" opacity=".3"/>
+              <rect x="5" y="6" width="9" height="6" rx="3" fill="var(--accent)"/>
+              <text x="17" y="24.5" text-anchor="middle" font-size="9.5" font-weight="800" fill="var(--ink)">128</text>
+              <g fill="var(--muted)" opacity=".4"><rect x="6" y="30" width="6" height="3" rx="1"/><rect x="14" y="30" width="6" height="3" rx="1"/><rect x="22" y="30" width="6" height="3" rx="1"/><rect x="6" y="34.5" width="6" height="3" rx="1"/><rect x="14" y="34.5" width="6" height="3" rx="1"/><rect x="22" y="34.5" width="6" height="3" rx="1"/><rect x="6" y="39" width="6" height="3" rx="1"/><rect x="14" y="39" width="6" height="3" rx="1"/><rect x="22" y="39" width="6" height="3" rx="1"/></g>
+            </svg>
+            <span class="pp-txt"><b>Direkt starten</b><span>Startet mit Blutdruck. Oben wechselst du den Wert.</span></span>
+            <span class="pp-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          </button>
+          <button type="button" class="pp-opt" data-plus="c" aria-pressed="false">
+            <svg class="pp-mini" viewBox="0 0 34 46" aria-hidden="true">
+              <rect x="1" y="1" width="32" height="44" rx="6" fill="var(--surf2)" stroke="var(--line)" stroke-width="1.5"/>
+              <rect x="5" y="6" width="4" height="2.5" rx="1.25" fill="var(--accent)"/>
+              <g fill="var(--muted)" opacity=".35"><rect x="10" y="6" width="4" height="2.5" rx="1.25"/><rect x="15" y="6" width="4" height="2.5" rx="1.25"/><rect x="20" y="6" width="4" height="2.5" rx="1.25"/><rect x="25" y="6" width="4" height="2.5" rx="1.25"/></g>
+              <text x="17" y="21.5" text-anchor="middle" font-size="9.5" font-weight="800" fill="var(--ink)">128</text>
+              <rect x="5" y="25" width="4" height="4" rx="1" fill="none" stroke="var(--accent)" stroke-width="1"/>
+              <g fill="none" stroke="var(--muted)" stroke-opacity=".55" stroke-width=".8"><rect x="10" y="25" width="4" height="4" rx="1"/><rect x="15" y="25" width="4" height="4" rx="1"/><rect x="20" y="25" width="4" height="4" rx="1"/><rect x="25" y="25" width="4" height="4" rx="1"/></g>
+              <g fill="var(--muted)" opacity=".4"><rect x="6" y="32.5" width="6" height="3" rx="1"/><rect x="14" y="32.5" width="6" height="3" rx="1"/><rect x="22" y="32.5" width="6" height="3" rx="1"/><rect x="6" y="37" width="6" height="3" rx="1"/><rect x="14" y="37" width="6" height="3" rx="1"/><rect x="22" y="37" width="6" height="3" rx="1"/></g>
+            </svg>
+            <span class="pp-txt"><b>Alles nacheinander</b><span>Alle Werte in einem Durchgang. Was fehlt, überspringst du.</span><i class="pp-std">Standard</i></span>
+            <span class="pp-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          </button>
+        </div>
       </div>
-      <div class="acc-swatches" id="accentPick" role="group" aria-label="Akzentfarbe"></div>
     </div>
     </div>
-    </div>
-    <button class="acc-head" id="mHelp" type="button">
-      <span class="lbl"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.5 1.4c0 1.6-2.2 2-2.4 3.1"/><path d="M12 17h.01"/></svg>Anleitung</span>
-      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+
+    <!-- ===== Anleitung (eigene Karte, öffnet das Hilfe-Fenster) ===== -->
+    <button class="acc-head acc-link" id="mHelp" type="button">
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.5 1.4c0 1.6-2.2 2-2.4 3.1"/><path d="M12 17h.01"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">Anleitung</span><span class="acc-s">10 Themen</span></span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
     </button>
   </div>
   <div class="dlg-actions menu-actions"><button class="btn-fill menu-close" id="menuClose" type="button">Menü schließen</button></div>
 </dialog>
 
-<!-- Anleitung / Hilfe -->
+<!-- Anleitung: 10 Themen zum Aufklappen (immer nur eins offen, das geöffnete rutscht nach oben) -->
 <dialog id="helpDlg">
+  <div class="dlg-grab" aria-hidden="true"></div>
   <div class="dlg-head">So funktioniert's</div>
-  <div class="dlg-body">
-    <p class="help-p"><b>Werte eintragen:</b> Tippe unten auf das große <b>+</b>. Gib nacheinander Systolisch, Diastolisch und Puls über den Ziffernblock ein – die App führt dich Schritt für Schritt. Datum und Uhrzeit stehen auf „Jetzt", lassen sich aber antippen und ändern. Eine Notiz (z. B. „nach dem Sport") ist optional.</p>
-    <p class="help-p"><b>Dashboard (Startseite):</b> Fasst das Wichtigste zusammen – deine letzte Messung mit Ampel-Status, der Schnitt der letzten 7 Tage samt Trend und die Verteilung grün/gelb/rot.</p>
-    <p class="help-p"><b>Farben (Ampel):</b> Grün heißt im Zielbereich, Gelb leicht erhöht, Rot deutlich erhöht. Ab wann Gelb bzw. Rot gilt, stellst du selbst ein: Menü → „Anzeige" → „Zielbereich".</p>
-    <p class="help-p"><b>Verlauf:</b> Alle Messungen als Liste, neueste zuerst; Sys und Dia sind je nach Wert eingefärbt. Tippe einen Eintrag an, um Einzelheiten zu sehen, ihn zu bearbeiten oder zu löschen. Oben wählst du den Zeitraum (7 / 30 / 90 Tage oder „Zeitraum" für eigene Von-Bis-Daten).</p>
-    <p class="help-p"><b>Diagramm:</b> Zeigt deinen Verlauf über die Zeit. Unten schaltest du zwischen <b>Sys</b>, <b>Dia</b> und <b>Beide</b> um, blendest den <b>Puls</b> ein und wählst den Zeitraum. Die Punkte sind in Ampelfarbe, die gestrichelte Linie ist dein Durchschnitt. Die genauen Werte einer Messung findest du über Verlauf → Eintrag antippen.</p>
-    <p class="help-p"><b>Automatisches Backup (am bequemsten):</b> Verknüpfe einmal eine Datei – danach sichert die App jede Änderung von selbst dort hinein. Menü → „Backup" → „Automatisches Backup": „Neu anlegen" erstellt eine neue Datei, „Auswählen" nimmt eine vorhandene. Steht oben grün „Verknüpft: …", läuft alles automatisch; rot „Keine Datei verknüpft" heißt: noch nicht eingerichtet. Mit „Ändern" wechselst du die Datei, mit „Lösen" trennst du die Verknüpfung (die Datei selbst bleibt erhalten). Gibt es nur in Chrome/Edge (auch Android) – auf iPhone/Safari ist sie ausgegraut.</p>
-    <p class="help-p"><b>Manuelles Backup &amp; Teilen:</b> „Speichern" lädt eine Backup-Datei herunter, „Backup teilen" schickt sie an Cloud, Mail oder Messenger. „Wiederherstellen" liest eine Backup-Datei wieder ein und führt sie mit deinen Daten zusammen – nichts geht verloren. „Erinnerung" stupst dich an, wenn es seit einigen Tagen ungesicherte Änderungen gibt.</p>
-    <p class="help-p"><b>Einstellungen sind dabei:</b> In einem Backup stecken jetzt auch deine Einstellungen (Schwellenwerte, Hell/Dunkel und mehr). Beim Wiederherstellen fragt die App, ob sie diese ebenfalls übernehmen soll.</p>
-    <p class="help-p"><b>Daten:</b> Menü → „Daten": „Als CSV exportieren" für Excel/Auswertung, „Alle Daten löschen" (mit Rückfrage; eine vorhandene Backup-Datei bleibt erhalten). Darunter steht, wie viel Speicher belegt ist.</p>
-    <p class="help-p"><b>Aussehen anpassen:</b> Unter Menü → „Anzeige" → „Design" wählst du zwischen Hell, Dunkel und Auto (folgt dem Gerät) und stellst eine Akzentfarbe ein.</p>
-    <p class="help-p"><b>Wichtig – nichts verlieren:</b> Deine Daten liegen nur auf diesem Gerät. Richte einmal das automatische Backup ein oder sichere ab und zu manuell – dann sind deine Werte geschützt, falls das Gerät verloren geht.</p>
-    <p class="help-p"><b>Tipp – App installieren:</b> Lege die App auf den Home-Bildschirm (iPhone: Teilen → „Zum Home-Bildschirm"; Android: Menü → „App installieren"). Dann startet sie wie eine echte App und der Speicher bleibt dauerhaft erhalten.</p>
+  <div class="dlg-body" id="helpBody">
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp1">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+        <span class="hlp-t">Werte eintragen</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp1" hidden>
+        <p>Tippe unten auf das große +. Die App führt dich Schritt für Schritt durch die Eingabe über den Ziffernblock:</p>
+        <p class="hlp-pt">Blutdruck: Systolisch, Diastolisch und Puls nacheinander.</p>
+        <p class="hlp-pt">Temperatur: drei Ziffern, das Komma setzt die App. Aus 368 wird 36,8 °C.</p>
+        <p class="hlp-pt">Sauerstoff: zwei oder drei Ziffern, höchstens 100 %.</p>
+        <p>Datum und Uhrzeit stehen auf „Jetzt“, du kannst sie antippen und ändern. Eine Notiz (z. B. „nach dem Sport“) ist freiwillig.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp2">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 8v8M8 12h8"/></svg></span>
+        <span class="hlp-t">Plus-Button</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp2" hidden>
+        <p>Was das große + macht, legst du unter Menü → „Anzeige“ → „Neue Messung (Plus-Button)“ fest.</p>
+        <p class="hlp-pt">„Erst wählen“ fragt zuerst, was du messen möchtest.</p>
+        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck, oben wechselst du zu Temperatur oder Sauerstoff.</p>
+        <p class="hlp-pt">„Alles nacheinander“ (Standard) führt dich durch alle Werte; was du nicht gemessen hast, überspringst du. Eine Notiz gilt dann für alle Werte dieses Durchgangs.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp3">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/></svg></span>
+        <span class="hlp-t">Dashboard (Startseite)</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp3" hidden>
+        <p>Oben steht deine letzte Messung mit Ampel-Farbe und Ampel-Wort.</p>
+        <p>Darunter siehst du für Blutdruck, Puls, Temperatur und Sauerstoff den Durchschnitt der letzten 7 Tage, ebenfalls mit Ampel-Farbe (beim Puls ohne). Einen Durchschnitt gibt es erst ab 3 Messungen.</p>
+        <p>Wie sich deine Werte über die Zeit entwickeln, zeigt der Tab „Diagramm“.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp4">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M7 12a5 5 0 1 0 10 0a5 5 0 1 0-10 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/></svg></span>
+        <span class="hlp-t">Farben und Zielbereich</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp4" hidden>
+        <p>Grün heißt: im Zielbereich. Gelb: etwas außerhalb. Rot: deutlich außerhalb. Dazu steht immer ein Wort, z. B. „Erhöht“ oder „Fieber“.</p>
+        <p class="hlp-pt">Temperatur: Gelb gibt es in beide Richtungen, „Niedrig“ und „Erhöht“.</p>
+        <p class="hlp-pt">Sauerstoff: Hier sind die niedrigen Werte gelb oder rot.</p>
+        <p>Ab wann welche Farbe gilt, stellst du unter Menü → „Zielbereich“ ein. Die Standardwerte sind gängige Richtwerte.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp5">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19h16M5 15l4-5 4 3 6-7"/></svg></span>
+        <span class="hlp-t">Verlauf und Diagramm</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp5" hidden>
+        <p>Oben wählst du Blutdruck, Temperatur oder Sauerstoff und den Zeitraum: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
+        <p class="hlp-pt">Verlauf: alle Messungen, neueste zuerst. Tippe eine an, um sie anzusehen, zu bearbeiten oder zu löschen.</p>
+        <p class="hlp-pt">Diagramm: deine Werte über die Zeit. Die Punkte haben die Ampel-Farbe, die gestrichelte Linie ist der Durchschnitt. Beim Blutdruck schaltest du zwischen Sys, Dia und Beide um und blendest den Puls ein.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp6">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V6z"/></svg></span>
+        <span class="hlp-t">Backup: nichts verlieren</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp6" hidden>
+        <p>Deine Werte liegen nur in dieser App auf diesem Handy. Ein Backup ist eine Datei mit allen Werten und Einstellungen.</p>
+        <p class="hlp-pt">„Speichern“ legt die Datei auf diesem Handy ab.</p>
+        <p class="hlp-pt">Das automatische Backup schreibt jede Änderung von selbst in eine Datei. Auch sie liegt auf diesem Handy. Es gibt das nur in Chrome und Edge (auch auf Android), nicht auf dem iPhone.</p>
+        <div class="hlp-box hlp-safe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span><b>Wirklich sicher:</b> Geht das Handy verloren oder kaputt, sind auch diese Dateien weg. Tippe deshalb ab und zu auf „Backup teilen“ und schicke die Datei an einen zweiten Ort, zum Beispiel in eine Cloud (Google Drive, iCloud), per Mail oder an deinen Computer.</span>
+        </div>
+        <p>Oben im Backup siehst du, ob es ungesicherte Änderungen gibt. Nach der eingestellten Zahl an Tagen erinnert dich die App.</p>
+        <div class="hlp-box hlp-warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg>
+          <span><b>Achtung Android:</b> Nutzt du noch die alte Blutdruck-App, verknüpfe beim automatischen Backup nie dieselbe Datei in beiden Apps. Die alte App kennt Temperatur und Sauerstoff nicht und würde die Datei ohne diese Werte überschreiben.</span>
+        </div>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp7">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg></span>
+        <span class="hlp-t">Wiederherstellen und neues Handy</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp7" hidden>
+        <p>„Wiederherstellen“ liest eine Backup-Datei ein und führt sie mit deinen Werten zusammen. Dabei geht nichts verloren.</p>
+        <p>Stecken in der Datei auch Einstellungen (Zielbereich, Design und mehr), fragt die App, ob du sie übernehmen willst.</p>
+        <p>Neues Handy: App installieren, dann Menü → „Backup“ → „Wiederherstellen“ und die geteilte Datei auswählen.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp8">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span>
+        <span class="hlp-t">Daten: Export und Löschen</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp8" hidden>
+        <p class="hlp-pt">„Als CSV exportieren“ macht eine Tabelle für Excel.</p>
+        <p class="hlp-pt">„Arzt-Report“ bereitet deine Werte zum Drucken oder als PDF auf.</p>
+        <p class="hlp-pt">„Alle Daten löschen“ löscht Blutdruck, Temperatur und Sauerstoff. Vorher fragt die App nach. Eine Backup-Datei bleibt erhalten.</p>
+        <p>Darunter steht, wie viel Speicher belegt ist.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp9">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 3v18"/></svg></span>
+        <span class="hlp-t">Aussehen</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp9" hidden>
+        <p>Unter Menü → „Anzeige“ → „Design“ wählst du Hell, Dunkel oder Auto (folgt dem Handy) und eine Akzentfarbe.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp10">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM12 7v7M9 11l3 3 3-3"/></svg></span>
+        <span class="hlp-t">App installieren</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp10" hidden>
+        <p>Lege die App auf den Home-Bildschirm. Dann startet sie wie eine echte App, und der Speicher bleibt dauerhaft erhalten.</p>
+        <p class="hlp-pt">iPhone: Teilen → „Zum Home-Bildschirm“.</p>
+        <p class="hlp-pt">Android: Menü → „App installieren“.</p>
+      </div>
+    </div>
   </div>
   <div class="dlg-actions"><button class="btn-text" id="helpBack" type="button">‹ Zurück</button><span class="grow"></span><button class="btn-fill" id="helpClose" type="button">Menü schließen</button></div>
 </dialog>

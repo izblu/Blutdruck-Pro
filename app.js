@@ -1447,7 +1447,8 @@ async function refreshLinkFileUI(){
 $('#mImport').addEventListener('click',()=>$('#importFile').click());
 $('#importFile').addEventListener('change',e=>{ if(e.target.files[0]){ $('#menuDlg').close(); importJSON(e.target.files[0]); } e.target.value=''; });
 $('#mClearAll').addEventListener('click',clearAllData);
-$('#mHelp').addEventListener('click',()=>{ $('#menuDlg').close(); $('#helpDlg').showModal(); });
+$('#mHelp').addEventListener('click',()=>{ $('#menuDlg').close(); openHelp(); });
+const reduceMotion=()=>!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 // Aufklappbare Abschnitte öffnen/schließen
 $$('#menuDlg .acc-head[aria-controls]').forEach(h=>h.addEventListener('click',()=>{
   const open=h.getAttribute('aria-expanded')==='true';
@@ -1461,8 +1462,33 @@ $$('#menuDlg .acc-head[aria-controls]').forEach(h=>h.addEventListener('click',()
   if(!open){
     h.setAttribute('aria-expanded','true');
     $('#'+h.getAttribute('aria-controls')).classList.add('open');
-    h.closest('.acc-sec').classList.add('open');   // Karten-Optik des offenen Abschnitts
+    const sec=h.closest('.acc-sec');
+    sec.classList.add('open');   // Karten-Optik des offenen Abschnitts (Schatten)
+    // Ragt der geöffnete Abschnitt unten heraus: so weit hochschieben, dass er ganz zu sehen ist
+    // (höchstens bis sein Kopf oben steht).
+    requestAnimationFrame(()=>{
+      const body=$('#menuDlg .dlg-body'), br=body.getBoundingClientRect(), sr=sec.getBoundingClientRect();
+      if(sr.bottom>br.bottom) body.scrollBy({top:Math.min(sr.top-br.top-12,sr.bottom-br.bottom+12),behavior:reduceMotion()?'auto':'smooth'});
+    });
   }
+}));
+/* ---------- Anleitung: 10 Themen zum Aufklappen ----------
+   Immer nur ein Thema offen; das geöffnete rutscht nach oben, damit sein Text zu sehen ist. */
+function closeHelpTopics(){
+  $$('#helpDlg .hlp-head').forEach(o=>{ o.setAttribute('aria-expanded','false'); $('#'+o.getAttribute('aria-controls')).hidden=true; o.parentElement.classList.remove('open'); });
+}
+function openHelp(){ closeHelpTopics(); $('#helpBody').scrollTop=0; $('#helpDlg').showModal(); }
+$$('#helpDlg .hlp-head').forEach(h=>h.addEventListener('click',()=>{
+  const open=h.getAttribute('aria-expanded')==='true';
+  closeHelpTopics();
+  if(open) return;
+  const t=h.parentElement;
+  h.setAttribute('aria-expanded','true'); $('#'+h.getAttribute('aria-controls')).hidden=false; t.classList.add('open');
+  requestAnimationFrame(()=>{
+    const body=$('#helpBody');
+    const top=t.getBoundingClientRect().top-body.getBoundingClientRect().top+body.scrollTop-8;
+    body.scrollTo({top:Math.max(0,top),behavior:reduceMotion()?'auto':'smooth'});
+  });
 }));
 // Speicher-Status: dauerhaft gesichert? wie viel belegt?
 // Belegter Speicher als reine Info – mit Kapazität und Prozent, sofern der Browser eine Quota
@@ -1487,7 +1513,7 @@ async function updateStorageStatus(){
 
 /* ---------- Backup-Erinnerung ---------- */
 const DAY=86400000;
-function markDirty(){ if(!settings.firstDirtyAt){ settings.firstDirtyAt=new Date().toISOString(); persistSettings(); } }
+function markDirty(){ if(!settings.firstDirtyAt){ settings.firstDirtyAt=new Date().toISOString(); persistSettings(); renderBackupState(); } }
 function markBackedUp(){ settings.firstDirtyAt=null; settings.snoozeUntil=0; persistSettings(); updateReminder(); }   // persistSettings statt saveSettings: kein erneutes Auto-Backup (sonst Endlosschleife)
 function reminderDaysDue(){
   const d=+settings.reminderDays||0;
@@ -1502,7 +1528,43 @@ function updateReminder(){
     $('#reminderMsg').textContent=`Seit ${days} ${days===1?'Tag':'Tagen'} ungesicherte Änderungen – jetzt ein Backup speichern?`;
     el.hidden=false;
   } else el.hidden=true;
+  renderBackupState();
 }
+/* Stand des Backups: dieselbe Logik für den Stand-Block (Backup offen) und die Stand-Zeile unter
+   „Backup" (zu). Hängt am selben Merker wie die Erinnerung (settings.firstDirtyAt + reminderDays).
+   „Gesichert" zählt jedes Backup, das markBackedUp() aufruft (Speichern, Teilen, Datei, Alle löschen). */
+const tageTxt=k=>k===1?'1 Tag':k+' Tagen';
+function backupState(){
+  const n=Math.max(0,+settings.reminderDays||0);
+  if(!settings.firstDirtyAt) return {tone:'g',icon:'ok',title:'Alles gesichert',sub:n?'Erinnerung nach '+tageTxt(n)+' ohne Backup':'Erinnerung ist aus'};
+  const seit=Math.max(0,Math.floor((Date.now()-new Date(settings.firstDirtyAt).getTime())/DAY));
+  const title=seit?'Seit '+tageTxt(seit)+' nicht gesichert':'Seit heute nicht gesichert';
+  if(!n) return {tone:'y',icon:'uhr',title,sub:'Erinnerung ist aus'};
+  if(seit>=n) return {tone:'y',icon:'glocke',title,sub:'Erinnerung ist fällig'};
+  return {tone:'y',icon:'uhr',title,sub:'Erinnerung in '+tageTxt(n-seit)};
+}
+const BK_IC={ok:'<path d="M20 6L9 17l-5-5"/>',uhr:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  glocke:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'};
+function renderBackupState(){
+  const card=$('.bk-card'); if(!card) return;
+  const s=backupState(), n=Math.max(0,+settings.reminderDays||0);
+  card.classList.remove('tone-g','tone-y'); card.classList.add('tone-'+s.tone);
+  $('#bkStIc').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(s.icon==='ok'?2.6:2.3)+'" stroke-linecap="round" stroke-linejoin="round">'+BK_IC[s.icon]+'</svg>';
+  $('#bkStT').textContent=s.title; $('#bkStS').textContent=s.sub;
+  const sum=$('#sumBackup'); sum.className='acc-s acc-s-bk tone-'+s.tone;
+  sum.innerHTML='<span class="dot" aria-hidden="true"></span>'+escapeHtml(s.title);
+  $('#remVal').textContent=n?'nach '+tageTxt(n):'aus';
+  $('#remMinus').setAttribute('aria-disabled',n<=0?'true':'false');
+  $('#remPlus').setAttribute('aria-disabled',n>=30?'true':'false');
+}
+/* Erinnerung − / + (0 = aus, höchstens 30 Tage); ersetzt das frühere Zahlenfeld. */
+function stepReminder(d){
+  const n=Math.max(0,+settings.reminderDays||0);
+  if((d<0&&n<=0)||(d>0&&n>=30)) return;
+  settings.reminderDays=n+d; saveSettings(); updateReminder();
+}
+$('#remMinus').addEventListener('click',()=>stepReminder(-1));
+$('#remPlus').addEventListener('click',()=>stepReminder(1));
 $('#reminderSave').addEventListener('click',()=>exportJSON());
 $('#reminderLater').addEventListener('click',()=>{ settings.snoozeUntil=Date.now()+DAY; persistSettings(); updateReminder(); });
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updateReminder(); });
@@ -1563,10 +1625,81 @@ function applyTheme(){
 /* Im Auto-Modus dem Systemwechsel folgen: die Struktur-/Ampelfarben schaltet CSS selbst um,
    nur der modus-abhängige Akzentwert muss nachgezogen werden. */
 if(window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(settings.theme==='auto'){ applyAccent(); applyAccentSwatches(); } });
-function applyThrUI(){
-  const t=settings.thr;
-  $('#thrSysY').value=t.sysY; $('#thrDiaY').value=t.diaY;
-  $('#thrSysR').value=t.sysR; $('#thrDiaR').value=t.diaR;
+/* ---------- Zielbereich: Ampel-Leisten mit 9 Grenzen ----------
+   Je Wert eine schematische Leiste (Breiten fest, nicht maßstäblich), darunter die Grenzen als
+   Eingabe-Chips genau an den Übergängen. Regel: Jede Zahl gehört zum Bereich rechts davon („ab").
+   Alle Leisten steigen von links nach rechts → Prüfung: die Zahlen müssen nach rechts größer werden. */
+const THR_ROWS=[
+  {id:'sys', name:'Systolisch', unit:'mmHg',dec:0,seg:[['g','Im Ziel',44],['y','Erhöht',28],['r','Zu hoch',28]],keys:['sysY','sysR']},
+  {id:'dia', name:'Diastolisch',unit:'mmHg',dec:0,seg:[['g','Im Ziel',44],['y','Erhöht',28],['r','Zu hoch',28]],keys:['diaY','diaR']},
+  {id:'temp',name:'Temperatur', unit:'°C',  dec:1,seg:[['y','Niedrig',20],['g','Normal',30],['y','Erhöht',25],['r','Fieber',25]],keys:['tempLow','tempY','tempR']},
+  {id:'spo2',name:'Sauerstoff', unit:'%',   dec:0,seg:[['r','Zu niedrig',28],['y','Niedrig',28],['g','Im Ziel',44]],keys:['spo2Y','spo2G']}
+];
+const thrShow=(v,dec)=>dec?(+v).toFixed(1).replace('.',','):String(Math.round(+v));
+/* Komma und Punkt zählen beide (iPhone-Tastatur liefert je nach Region das eine oder andere). */
+function thrRead(text,dec){ const t=String(text).trim().replace(',','.'); return (dec?/^\d{1,3}(\.\d)?$/:/^\d{1,3}$/).test(t)?parseFloat(t):null; }
+function thrCheck(r,k,text){
+  const v=thrRead(text,r.dec);
+  if(v===null) return r.dec?'Bitte eine Zahl wie 37,5 eingeben.':'Bitte eine ganze Zahl eingeben.';
+  if(r.id==='spo2'&&v>100) return 'Höchstens 100 %.';
+  const w=r.keys.map(kk=>kk===k?v:+settings.thr[kk]);
+  for(let i=0;i<w.length-1;i++) if(!(w[i]<w[i+1])) return 'Nicht übernommen: Die Zahlen müssen von links nach rechts größer werden.';
+  return '';
+}
+/* „Fertig aussehend" (Temperatur NN,N, sonst 2–3 Ziffern): erst dann Fehler zeigen bzw. sofort übernehmen,
+   damit beim Tippen von 38,5 nicht schon bei „3" etwas rot blinkt. */
+const thrDone=(r,text)=>(r.dec?/^\d{2}[.,]\d$/:/^\d{2,3}$/).test(String(text).trim());
+/* Beim Verlassen darf die Temperatur auch ohne Nachkommastelle stehen (37 → 37,0). */
+const thrLeaveOk=(r,text)=>(r.dec?/^\d{2}([.,]\d)?$/:/^\d{2,3}$/).test(String(text).trim());
+const ERR_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg>';
+function renderThrBars(){
+  const host=$('#thrBars'); if(!host) return;
+  host.innerHTML=THR_ROWS.map(r=>{
+    let sum=0; const cuts=[];
+    const seg=r.seg.map((s,i)=>{ if(i) cuts.push(sum); sum+=s[2]; return '<span class="thr-seg '+s[0]+'" style="flex-basis:'+s[2]+'%">'+s[1]+'</span>'; }).join('');
+    const chips=r.keys.map((k,i)=>'<label class="thr-lab" style="left:calc('+cuts[i]+'% - 26px)">'+
+      '<input class="thr-in" type="text" inputmode="'+(r.dec?'decimal':'numeric')+'" autocomplete="off" enterkeyhint="done" '+
+      'data-row="'+r.id+'" data-key="'+k+'" aria-label="'+r.name+': '+r.seg[i+1][1]+' ab" value="'+thrShow(settings.thr[k],r.dec)+'"></label>').join('');
+    return '<div class="thr-row" role="group" aria-label="'+r.name+'">'+
+      '<div class="thr-row-h"><span class="thr-name">'+r.name+'</span><span class="thr-unit">'+r.unit+'</span></div>'+
+      '<div class="thr-bar" aria-hidden="true">'+seg+'</div><div class="thr-chips">'+chips+'</div>'+
+      '<div class="thr-err" role="alert" hidden>'+ERR_IC+'<span></span></div></div>';
+  }).join('');
+}
+function showThrErr(inp,msg){
+  inp.classList.toggle('bad',!!msg);
+  const box=inp.closest('.thr-row').querySelector('.thr-err');
+  box.querySelector('span').textContent=msg; box.hidden=!msg;
+}
+let _thrChanged=false;   // Grenzen geändert → beim Schließen des Menüs alle Ansichten neu einfärben
+function applyThr(k,v){
+  if(+settings.thr[k]===v) return;
+  settings.thr[k]=v; saveSettings(); _thrChanged=true; updateTargetSummary();
+  renderTable(); if(currentTab==='chart') renderChart();   // Echtzeit: Verlauf (und Diagramm, falls offen)
+}
+function thrRowOf(inp){ return THR_ROWS.find(x=>x.id===inp.dataset.row); }
+$('#thrBars').addEventListener('input',e=>{
+  const inp=e.target.closest('.thr-in'); if(!inp) return;
+  const r=thrRowOf(inp), k=inp.dataset.key;
+  if(!thrDone(r,inp.value)){ showThrErr(inp,''); return; }
+  const err=thrCheck(r,k,inp.value);
+  if(!err) applyThr(k,thrRead(inp.value,r.dec));   // eine gültige Eingabe gilt sofort
+  showThrErr(inp,err);
+});
+// Verlassen: Gültiges übernehmen und hübsch formatieren, Ungültiges auf den alten Wert zurücksetzen.
+$('#thrBars').addEventListener('focusout',e=>{
+  const inp=e.target.closest('.thr-in'); if(!inp) return;
+  const r=thrRowOf(inp), k=inp.dataset.key, old=thrShow(settings.thr[k],r.dec);
+  if(thrLeaveOk(r,inp.value)&&!thrCheck(r,k,inp.value)) applyThr(k,thrRead(inp.value,r.dec));
+  else if(inp.value.trim()!==old) toast('Nicht übernommen, der alte Wert gilt weiter.','notice');
+  inp.value=thrShow(settings.thr[k],r.dec); showThrErr(inp,'');
+});
+$('#thrBars').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.closest('.thr-in')) e.target.blur(); });
+function applyThrUI(){ renderThrBars(); updateTargetSummary(); }
+/* Stand-Zeile „Zielbereich": „Eigene Werte", sobald eine der 9 Grenzen vom Standard abweicht. */
+function updateTargetSummary(){
+  const custom=Object.keys(SET_DEFAULT.thr).some(k=>+settings.thr[k]!==+SET_DEFAULT.thr[k]);
+  $('#sumTarget').textContent=custom?'Eigene Werte':'Standardwerte';
 }
 /* Akzent-Auswahl: Punkte komplett neu bauen statt nur umzufärben, denn Hell und Dunkel haben
    jetzt unterschiedliche Farben UND eine unterschiedliche Anzahl eigener Töne (nicht mehr
@@ -1576,28 +1709,52 @@ function applyAccentSwatches(){
   const dark=resolveDark();
   const list=dark?ACCENTS_DARK:ACCENTS_LIGHT;
   const active=resolveAccent(dark).key;
+  // Knopf = 44 px Tippfläche im 6er-Raster, der sichtbare Kreis (.acc-dot) bleibt 32 px.
   $('#accentPick').innerHTML=list.map(a=>
     '<button type="button" class="acc-sw'+(a.key===active?' active':'')+'" data-accent="'+a.key+'" '+
-    'aria-label="'+escapeHtml(a.label)+'" style="background:'+a.c+';color:'+a.c+'">'+
+    'aria-label="'+escapeHtml(a.label)+'" aria-pressed="'+(a.key===active)+'" style="color:'+a.c+'">'+
+    '<span class="acc-dot" style="background:'+a.c+'">'+
     '<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="'+a.ink+'" stroke-width="3" '+
     'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>'+
-    '</button>'
+    '</span></button>'
   ).join('');
+  updateViewSummary();
 }
 function applyThemeSeg(){ $$('#themeSeg [data-theme]').forEach(b=>b.classList.toggle('active',b.dataset.theme===settings.theme)); }
+/* Neue Messung (Plus-Button): drei Wahlzeilen, gilt sofort beim Antippen (wie die Akzentfarbe). */
+function applyPlusPick(){ const m=plusModeNow(); $$('#plusPick .pp-opt').forEach(b=>b.setAttribute('aria-pressed',b.dataset.plus===m?'true':'false')); }
+$('#plusPick').addEventListener('click',e=>{
+  const b=e.target.closest('.pp-opt'); if(!b) return;
+  settings.plusMode=b.dataset.plus; saveSettings(); applyPlusPick();
+});
+/* Stand-Zeilen unter den Abschnittsnamen (Backup macht renderBackupState, Zielbereich updateTargetSummary). */
+const THEME_LBL={light:'Hell',dark:'Dunkel',auto:'Auto'};
+function updateViewSummary(){ $('#sumView').textContent=(THEME_LBL[settings.theme]||'Auto')+' · '+resolveAccent(resolveDark()).label; }
+function updateDataSummary(){
+  const n=totalCount(), parts=countParts();
+  $('#sumData').textContent=n?n+(n===1?' Messung':' Messungen'):'Noch keine Messungen';
+  $('#csvNote').textContent=parts.length?parts.join(' · '):'Noch keine Messungen';
+}
 function applySettingsUI(){
-  $('#setReminderDays').value=settings.reminderDays;
   applyThemeSeg();
   applyThrUI();
   applyAccentSwatches();
+  applyPlusPick();
+  renderBackupState();
+  updateDataSummary();
 }
-$('#menuBtn').addEventListener('click',()=>{ applySettingsUI(); updateStorageStatus(); refreshLinkFileUI(); const cn=$('#csvNote'); if(cn) cn.textContent=entries.length+(entries.length===1?' Messung':' Messungen')+' · für Excel/Tabellen'; $('#menuDlg').showModal(); });
+function openMenu(){ applySettingsUI(); updateStorageStatus(); refreshLinkFileUI(); $('#menuDlg').showModal(); }
+$('#menuBtn').addEventListener('click',openMenu);
+// Android-Warnung immer, wenn das automatische Backup hier überhaupt geht (verknüpft oder nicht).
+$('#fsWarn').hidden=!FS_SUPPORTED;
 $('#menuClose').addEventListener('click',()=>$('#menuDlg').close());
+// Grenzen geändert? Dann beim Schließen alles neu einfärben (Dashboard, Detail …).
+$('#menuDlg').addEventListener('close',()=>{ if(_thrChanged){ _thrChanged=false; refreshData(); } });
 // Schließen nur, wenn der Klick die Backdrop-Fläche (das Dialog-Element selbst) trifft –
 // robust gegen das Neu-Zentrieren beim Auf-/Zuklappen der Abschnitte.
 $('#menuDlg').addEventListener('click',e=>{ if(e.target===e.currentTarget) e.currentTarget.close(); });
 $('#helpClose').addEventListener('click',()=>$('#helpDlg').close());
-$('#helpBack').addEventListener('click',()=>{ $('#helpDlg').close(); $('#menuDlg').showModal(); });   // zurück ins Menü
+$('#helpBack').addEventListener('click',()=>{ $('#helpDlg').close(); openMenu(); });   // zurück ins Menü
 $('#helpDlg').addEventListener('click',e=>{ if(e.target===e.currentTarget) e.currentTarget.close(); });
 // Wiederherstellen-Rückfrage: oben Werte+Einstellungen, unten nur Werte. Raustippen/Esc = nur Werte.
 $('#restoreWith').addEventListener('click',()=>{ $('#restoreDlg').close(); const s=_pendingRestoreSettings; _pendingRestoreSettings=null; if(s) applyBackupSettings(s); });
@@ -1614,10 +1771,6 @@ $$('dialog').forEach(d=>d.addEventListener('close',()=>{ const w=$('#toast'); if
 // Die Schalter „Werte-Ampel" (colorDots) und „Schwellenwert-Linien" (guideLines) entfielen in Stufe 6:
 // Verlauf färbt immer pro Wert, das Diagramm nutzt immer Ampelpunkte + Ø-Linie. Die Schlüssel bleiben
 // in settings/Backup (Rückwärtskompatibilität), nur ohne Bedienelement.
-$('#setReminderDays').addEventListener('input',e=>{
-  let v=parseInt(e.target.value,10); if(!Number.isFinite(v)||v<0) v=0;
-  settings.reminderDays=v; saveSettings(); updateReminder();
-});
 $$('#themeSeg [data-theme]').forEach(b=>b.addEventListener('click',()=>{ settings.theme=b.dataset.theme; saveSettings(); applyTheme(); applyThemeSeg(); applyAccentSwatches(); if(currentTab==='chart') renderChart(); }));
 // Akzentfarbe wählen: --accent app-weit setzen (applyAccent), Swatches auffrischen, Diagramm (Ø-Linie) nachziehen.
 // Delegiert auf den Container, weil applyAccentSwatches() die Punkte bei jedem Aufruf neu baut.
@@ -1625,13 +1778,8 @@ $('#accentPick').addEventListener('click',e=>{
   const b=e.target.closest('.acc-sw'); if(!b) return;
   settings.accent=b.dataset.accent; saveSettings(); applyAccent(); applyAccentSwatches(); if(currentTab==='chart') renderChart();
 });
-[['thrSysY','sysY'],['thrDiaY','diaY'],['thrSysR','sysR'],['thrDiaR','diaR']].forEach(([id,key])=>{
-  $('#'+id).addEventListener('input',e=>{
-    const v=parseInt(e.target.value,10);
-    if(Number.isFinite(v)){ settings.thr[key]=v; saveSettings(); renderTable(); if(currentTab==='chart') renderChart(); } // Echtzeit: Tabelle (und Diagramm, falls offen)
-  });
-});
-$('#thrReset').addEventListener('click',()=>{ settings.thr={...SET_DEFAULT.thr}; saveSettings(); applyThrUI(); renderTable(); if(currentTab==='chart') renderChart(); toast('Standardwerte wiederhergestellt','notice'); });
+// Setzt alle neun Grenzen zurück.
+$('#thrReset').addEventListener('click',()=>{ settings.thr={...SET_DEFAULT.thr}; saveSettings(); _thrChanged=true; applyThrUI(); renderTable(); if(currentTab==='chart') renderChart(); toast('Standardwerte wiederhergestellt','notice'); });
 
 /* ==================== ARZT-REPORT (Druck/PDF) ====================
    Aufbereiteter, druckbarer Bericht für den Arztbesuch (Kompakt-Layout + Querformat-Anhang),

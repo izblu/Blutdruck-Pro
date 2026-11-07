@@ -34,6 +34,7 @@
   --surface:var(--surf); --surface-2:var(--surf2); --menu-bg:var(--bg);
   --text:var(--ink); --border:var(--line);
   --primary:var(--accent); --primary-ink:var(--accent-ink);
+  --accent-soft:color-mix(in srgb,var(--accent) 13%,transparent);
   --cat-g:var(--g-bar); --cat-y:var(--y-bar); --cat-r:var(--r-bar);
   --danger:var(--r-bar);
   --c-sys:var(--r-bar); --c-dia:var(--accent); --c-pulse:var(--pulse-bar);
@@ -139,7 +140,6 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 }
 .dlg-grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:9px auto 2px;flex:0 0 auto}
 .dlg-head{padding:16px 18px 0;font-size:1.1rem;font-weight:700;flex:0 0 auto}
-#menuDlg .dlg-head{padding:2px 18px 4px;font-weight:800}
 .dlg-body{padding:14px 18px;flex:1 1 auto;min-height:0;overflow:auto}
 .dlg-actions{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--border);flex:0 0 auto}
 .dlg-actions .grow{flex:1}
@@ -176,87 +176,171 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .cdlg-check input{appearance:none;-webkit-appearance:none;width:20px;height:20px;flex:0 0 auto;margin:0;border:2px solid var(--danger);border-radius:6px;background:transparent;position:relative;cursor:pointer}
 .cdlg-check input:checked::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid var(--danger);border-width:0 2px 2px 0;transform:rotate(45deg)}
 .cdlg-check span{font-size:.92rem}
-.reason{display:block;font-size:11px;color:var(--muted);margin:-4px 0 8px 36px}
-/* Auto-Backup-Datei: Name + Aktionen */
-.lf-actions{display:flex;gap:8px}
-.lf-btn{flex:1;white-space:nowrap;text-align:center;padding:9px 6px;border:1px solid var(--line);border-radius:10px;background:var(--surf);color:var(--ink);font-size:12px;font-weight:700}
-.lf-btn:disabled{opacity:.6}
-/* Backup-Gruppen als abgesetzte Karten (Automatisch / Manuell) */
-.grp-card{background:var(--surf2);border:none;border-radius:14px;padding:11px 12px;margin-bottom:9px}
-.grp-head{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:800;margin:0 0 8px}
-#linkFileName{margin:0 0 7px}
-.is-linked{color:var(--cat-g);font-weight:600}
-.is-unlinked{color:var(--danger);font-weight:600}
-/* „Backup teilen": breiter Knopf unter den Gruppen-Karten */
-.share-btn{display:flex;width:100%;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:14px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-size:13px;font-weight:800}
-.share-btn .ic{width:17px;height:17px;color:var(--accent)}
-.share-btn:disabled{opacity:.5}
-/* Aufklappbare Abschnitte (Menü-Akkordeon) */
-.acc-head{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;background:none;border:none;color:var(--ink);padding:12px;font-weight:800;font-size:14.5px}
-.acc-head .lbl{display:flex;align-items:center;gap:11px}
-.acc-head .ic{width:31px;height:31px;flex:0 0 auto;box-sizing:border-box;padding:6px;border-radius:9px;color:var(--muted);background:transparent;transition:background-color .3s,color .3s}
+.reason{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:0 0 9px}
+/* ==== Menü, Aussehen A „Verfeinert" (Entwurf MenueAussehen.dc.html): jeder Abschnitt eine Karte
+   mit Stand-Zeile, Symbol im getönten Quadrat, größere Schrift, Tippflächen ab 44–48 px ==== */
+#menuDlg,#helpDlg{width:min(380px,calc(100vw - 32px))}
+#menuDlg .dlg-head{padding:4px 18px 2px;font-size:19px;font-weight:800;letter-spacing:-.01em}
+#menuDlg .dlg-body{padding:12px 16px 16px;display:flex;flex-direction:column;gap:9px;scrollbar-width:none}
+.acc-sec{background:var(--surf);border:1px solid var(--line);border-radius:18px;transition:box-shadow .3s}
+.acc-sec.open{box-shadow:0 12px 26px -14px rgba(20,30,50,.34)}
+.acc-head{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;text-align:left;background:none;border:none;color:var(--ink);padding:10px 12px 10px 13px;font:inherit;cursor:pointer}
+.acc-link{background:var(--surf);border:1px solid var(--line);border-radius:18px}
+.acc-ic{width:36px;height:36px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.acc-ic svg{width:19px;height:19px}
+.acc-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.acc-t{font-size:15.5px;font-weight:800}
+.acc-s{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.acc-s:empty{display:none}
+.acc-s .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:currentColor}
+.acc-s-bk.tone-g{color:var(--g-ink)} .acc-s-bk.tone-g .dot{background:var(--g-bar)}
+.acc-s-bk.tone-y{color:var(--y-ink)} .acc-s-bk.tone-y .dot{background:var(--y-bar)}
+.acc-sec.open .acc-s-bk{display:none}          /* offen zeigt der Stand-Block den Stand ausführlich */
 .acc-head .chev{width:20px;height:20px;flex:0 0 auto;color:var(--muted);transition:transform .25s}
+.acc-link .chev{width:18px;height:18px}
 .acc-head[aria-expanded="true"] .chev{transform:rotate(180deg)}
-.acc-body{display:none;padding:0 12px 13px}
-.acc-body.open{display:block}
-/* Aufgeklappter Abschnitt hebt sich als Karte ab (statt Trennlinien) */
-.acc-sec{border-radius:16px;transition:background-color .3s,box-shadow .3s}
-.acc-sec.open{background:var(--surf);box-shadow:0 8px 20px -10px rgba(20,30,50,.28);margin:3px 0}
-.acc-sec.open .acc-head .ic{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
-/* Anleitung-Pop-up */
-.help-p{margin:0 0 12px;font-size:.95rem;line-height:1.5}
-.switch{display:flex;align-items:center;justify-content:space-between;padding:12px 4px}
-#reminderHint{margin:6px 0 0;padding:2px 4px 12px}
+.acc-body{display:none;padding:0 12px 14px}
+.acc-body.open{display:flex;flex-direction:column;gap:10px}
+/* Innenkarten (grau, ohne Rand) und Blocküberschriften in normaler Schreibweise */
+.grp-card,.mblk{background:var(--surf2);border-radius:14px;padding:12px}
+.grp-head,.mblk-t{font-size:13.5px;font-weight:800;color:var(--ink);margin:0 0 9px}
+/* Knöpfe in den Innenkarten */
+.lf-actions{display:flex;gap:8px}
+.lf-btn{flex:1;min-height:46px;white-space:nowrap;text-align:center;padding:0 6px;border:1px solid var(--line);border-radius:11px;background:var(--surf);color:var(--ink);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.lf-btn:disabled{opacity:.6;cursor:default}
+#linkFileName{margin:0 0 9px;overflow-wrap:anywhere}
+.is-linked{color:var(--g-ink)}
+.is-unlinked{color:var(--r-ink)}
+/* Hinweise mit Symbol: Android-Warnung (gelb) und „zweiter Ort" (Akzent) */
+.m-warn,.m-info{display:flex;align-items:flex-start;gap:8px;margin:0;font-size:12.5px;font-weight:600;line-height:1.45;color:var(--muted)}
+.m-warn{margin-top:10px}
+.m-info{padding:2px 4px 0}
+.m-warn svg,.m-info svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px}
+.m-warn svg{color:var(--y-ink)}
+.m-info svg{color:var(--accent)}
+/* „Backup teilen": breiter Knopf unter den Karten */
+.share-btn{display:flex;width:100%;min-height:48px;align-items:center;justify-content:center;gap:8px;padding:0 12px;border:none;border-radius:14px;background:var(--accent-soft);color:var(--accent);font:inherit;font-size:14.5px;font-weight:800;cursor:pointer}
+.share-btn .ic{width:18px;height:18px;color:var(--accent)}
+.share-btn:disabled{opacity:.5;cursor:default}
+#mShareReason{margin:-4px 4px 0}
+/* Stand-Block ganz oben im Backup: Stand (grün/gelb) + Erinnerung − / + */
+.bk-card{padding:12px 12px 4px}
+.bk-st{display:flex;align-items:center;gap:11px}
+.bk-st-ic{width:34px;height:34px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;background:var(--st-bg);color:var(--st-ink)}
+.bk-st-ic svg{width:18px;height:18px}
+.bk-st-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.bk-st-t{font-size:14.5px;font-weight:800;color:var(--st-ink)}
+.bk-st-s{font-size:12.5px;font-weight:600;color:var(--muted)}
+.bk-card.tone-g{--st-bg:var(--g-soft);--st-ink:var(--g-ink)}
+.bk-card.tone-y{--st-bg:var(--y-soft);--st-ink:var(--y-ink)}
+.bk-rem{display:flex;align-items:center;justify-content:space-between;gap:6px;border-top:1px solid var(--line);margin-top:11px}
+.bk-rem-l{font-size:13.5px;font-weight:700}
+.stepper{display:flex;align-items:center}
+.step-btn{width:44px;height:46px;padding:0;border:0;background:transparent;display:grid;place-items:center;color:var(--ink);cursor:pointer}
+.step-btn>span{width:32px;height:32px;border-radius:50%;box-sizing:border-box;background:var(--surf);border:1px solid var(--line);display:grid;place-items:center}
+.step-btn svg{width:14px;height:14px}
+.step-btn[aria-disabled="true"]{opacity:.35;cursor:default}
+.step-val{min-width:92px;text-align:center;font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums}
 
-/* Menü-Unterblöcke (Anzeige: Zielbereich, Design) */
-.mblk{background:var(--surf2);border-radius:14px;padding:11px 12px;margin-bottom:9px}
-.mblk-t{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:800;margin-bottom:9px}
+/* Zielbereich: Ampel-Leisten (schematisch, nicht maßstäblich) mit Eingabe-Chips an den Übergängen.
+   Regel: Jede Zahl gehört zum Bereich rechts davon („ab"). Gebaut von renderThrBars() in app.js. */
+.thr-card{padding:12px 12px 4px}
+.thr-rows{display:flex;flex-direction:column;gap:10px}
+.thr-row-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.thr-name{font-size:13px;font-weight:700}
+.thr-unit{font-size:11.5px;font-weight:600;color:var(--muted)}
+.thr-bar{display:flex;height:24px;border-radius:8px;overflow:hidden}
+.thr-seg{flex:0 0 auto;box-sizing:border-box;display:grid;place-items:center;font-size:10.5px;font-weight:800;letter-spacing:.01em;white-space:nowrap;overflow:hidden}
+.thr-seg+.thr-seg{border-left:2px solid var(--surf2)}
+.thr-seg.g{background:var(--g-soft);color:var(--g-ink)}
+.thr-seg.y{background:var(--y-soft);color:var(--y-ink)}
+.thr-seg.r{background:var(--r-soft);color:var(--r-ink)}
+.thr-chips{position:relative;height:44px}
+.thr-lab{position:absolute;top:0;width:52px;height:44px;display:flex;flex-direction:column;align-items:center;cursor:text}
+.thr-lab::before{content:"";flex:0 0 auto;width:1.5px;height:5px;background:var(--muted);opacity:.6}
+.thr-in{flex:0 0 auto;width:52px;height:34px;box-sizing:border-box;margin:0;padding:0;border-radius:10px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font:inherit;font-size:14px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;-webkit-appearance:none;appearance:none;outline:none}
+.thr-in:focus{box-shadow:0 0 0 2px var(--accent)}
+.thr-in.bad{border:2px solid var(--r-bar);background:var(--r-soft);color:var(--r-ink)}
+.thr-err{display:flex;align-items:flex-start;gap:6px;margin:1px 0 2px;font-size:12px;font-weight:700;line-height:1.35;color:var(--r-ink)}
+.thr-err[hidden]{display:none}
+.thr-err svg{width:14px;height:14px;flex:0 0 auto;margin-top:1px}
+.thr-note{margin:6px 0 0;font-size:12px;font-weight:600;line-height:1.4;color:var(--muted)}
+.thr-reset{min-height:44px;padding:0;font:inherit;font-size:13px;font-weight:700;text-align:left}
 
-/* Zielbereich: Schwellenwerte editierbar als Ampel-Chips */
-.thr-grid2{display:grid;grid-template-columns:1fr 62px 62px;gap:8px;align-items:center}
-.thr-hcol{font-size:9.5px;font-weight:800;text-align:center;letter-spacing:.02em}
-.thr-hy{color:var(--y-ink)}
-.thr-hr{color:var(--r-ink)}
-.thr-name{font-size:12.5px;font-weight:700;color:var(--ink)}
-.thr-chip{width:100%;text-align:center;padding:7px 4px;border-radius:9px;font:inherit;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;border:1px solid transparent;-moz-appearance:textfield}
-.thr-chip::-webkit-outer-spin-button,.thr-chip::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.thr-chip-y{background:var(--y-soft);color:var(--y-ink);border-color:color-mix(in srgb,var(--y-bar) 30%,transparent)}
-.thr-chip-r{background:var(--r-soft);color:var(--r-ink);border-color:color-mix(in srgb,var(--r-bar) 30%,transparent)}
-.thr-chip:focus{outline:none;border-color:var(--accent)}
-.thr-reset{padding:9px 0 0;font-size:12.5px}
-
-/* Design: Hell/Dunkel/Auto-Pille */
-.theme-pill{display:flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--ink) 7%,transparent);margin-bottom:11px}
-.tp-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 4px;border:none;border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:background-color .2s,color .2s}
-.tp-btn svg{width:15px;height:15px;flex:0 0 auto}
+/* Design: Hell/Dunkel/Auto-Pille + Akzentfarben (6er-Raster, je 44 px Tippfläche, Kreis 32 px) */
+.theme-pill{display:flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--ink) 7%,transparent);margin-bottom:8px}
+.tp-btn{flex:1;min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 4px;border:none;border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background-color .2s,color .2s}
+.tp-btn svg{width:16px;height:16px;flex:0 0 auto}
 .tp-btn.active{background:var(--surf);color:var(--accent);box-shadow:0 1px 3px rgba(20,30,50,.16)}
-
-/* Akzentfarben-Auswahl (Swatch-Farbe je Hell/Dunkel per JS gesetzt → Ring nutzt currentColor) */
-.acc-swatches{display:flex;gap:13px;justify-content:center;padding-top:1px}
-.acc-sw{width:32px;height:32px;padding:0;border:none;border-radius:50%;cursor:pointer;display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(128,128,128,.3);transition:box-shadow .18s}
-.acc-sw.active{box-shadow:0 0 0 2px var(--surf2),0 0 0 4px currentColor}
+.acc-swatches{display:grid;grid-template-columns:repeat(6,1fr)}
+.acc-sw{height:44px;padding:0;border:none;background:transparent;display:grid;place-items:center;cursor:pointer}
+.acc-dot{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(128,128,128,.3);transition:box-shadow .18s}
+.acc-sw.active .acc-dot{box-shadow:0 0 0 2px var(--surf2),0 0 0 4px currentColor}
 .acc-sw .ck{width:15px;height:15px;opacity:0;transition:opacity .15s}
 .acc-sw.active .ck{opacity:1}
 
-/* Daten: Export-Zeile + Lösch-Knopf */
-.m-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--ink);cursor:pointer}
+/* Neue Messung (Plus-Button): drei Wahlzeilen mit Mini-Bild, gilt sofort beim Antippen */
+.plus-pick{display:flex;flex-direction:column;gap:7px}
+.pp-opt{width:100%;min-height:64px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:8px 10px;border:2px solid var(--line);border-radius:13px;background:var(--surf);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.pp-opt[aria-pressed="true"]{border-color:var(--accent)}
+.pp-mini{width:36px;height:49px;flex:0 0 auto}
+.pp-mini text{font-family:inherit}
+.pp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pp-txt b{font-size:13.5px;font-weight:800;line-height:1.2}
+.pp-txt span{font-size:12px;font-weight:600;color:var(--muted);line-height:1.3}
+.pp-std{align-self:flex-start;margin-top:3px;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.03em;color:var(--muted);background:var(--surf2);border-radius:999px;padding:2px 7px}
+.pp-ck{flex:0 0 auto;width:22px;height:22px;box-sizing:border-box;border-radius:50%;border:1.75px solid var(--muted);display:grid;place-items:center;color:var(--accent-ink)}
+.pp-ck svg{width:13px;height:13px;opacity:0}
+.pp-opt[aria-pressed="true"] .pp-ck{border:0;background:var(--accent)}
+.pp-opt[aria-pressed="true"] .pp-ck svg{opacity:1}
+
+/* Daten: Export-Zeilen + Lösch-Knopf */
+.m-row{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;box-sizing:border-box;text-align:left;background:var(--surf);border:1px solid var(--line);border-radius:11px;padding:0 12px;color:var(--ink);font:inherit;cursor:pointer}
 .m-row-ic{color:var(--accent);display:grid;place-items:center;flex:0 0 auto}
-.m-row-ic svg{width:19px;height:19px}
-.m-row-t{flex:1;font-size:12.5px;font-weight:700}
+.m-row-ic svg{width:20px;height:20px}
+.m-row-t{flex:1;font-size:13.5px;font-weight:700}
 .m-row-chev{width:17px;height:17px;color:var(--muted);flex:0 0 auto}
-.m-note{margin:8px 0 0;font-size:10.5px;color:var(--muted);font-weight:600}
+.m-note{margin:7px 2px 0;font-size:12px;color:var(--muted);font-weight:600}
 /* CSV-Knopf + sein Hinweis bilden eine Einheit; der nächste Knopf (Arzt-Report) bekommt klar mehr
    Luft, damit der Hinweis sichtbar NICHT zum Arzt-Report gehört. */
-.m-note + .m-row{margin-top:14px}
-.m-danger{display:flex;align-items:center;gap:9px;width:100%;padding:11px 12px;border:none;border-radius:14px;background:var(--r-soft);color:var(--r-ink);font:inherit;font-size:13px;font-weight:800;cursor:pointer}
-.m-danger svg{width:17px;height:17px;flex:0 0 auto}
+.m-note + .m-row{margin-top:12px}
+.m-danger{display:flex;align-items:center;gap:9px;width:100%;min-height:48px;padding:0 13px;border:none;border-radius:14px;background:var(--r-soft);color:var(--r-ink);font:inherit;font-size:14px;font-weight:800;text-align:left;cursor:pointer}
+.m-danger svg{width:18px;height:18px;flex:0 0 auto}
+.m-store{margin:0 3px;font-size:12.5px;font-weight:600}
+/* Fußleiste */
+.menu-close{min-height:46px;border-radius:12px;padding:0 20px;font:inherit;font-size:15.5px;font-weight:700}
+
+/* ==== Anleitung: 10 Themen zum Aufklappen (Entwurf Anleitung.dc.html) ==== */
+#helpDlg{height:82vh}
+#helpDlg .dlg-head{padding:2px 18px 4px;font-size:17.5px;font-weight:800;letter-spacing:-.01em}
+#helpBody{padding:12px 18px 16px;position:relative;scrollbar-width:none}
+.hlp{border-radius:16px;margin:2px 0;transition:background-color .3s,box-shadow .3s}
+.hlp.open{background:var(--surf);box-shadow:0 8px 20px -10px rgba(20,30,50,.28)}
+.hlp-head{width:100%;min-height:52px;display:flex;align-items:center;gap:11px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:800;text-align:left;padding:10px 12px;cursor:pointer}
+.hlp-ic{width:31px;height:31px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;color:var(--muted);transition:background-color .3s,color .3s}
+.hlp-ic svg{width:18px;height:18px}
+.hlp.open .hlp-ic{background:var(--accent-soft);color:var(--accent)}
+.hlp-t{flex:1}
+.hlp-head .chev{width:20px;height:20px;flex:0 0 auto;color:var(--muted);transition:transform .25s}
+.hlp-head[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.hlp-body:not([hidden]){display:flex;flex-direction:column;gap:9px;padding:0 14px 15px}
+.hlp-body p{margin:0;font-size:13.5px;font-weight:500;line-height:1.5}
+.hlp-pt{position:relative;padding-left:14px}
+.hlp-pt::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.hlp-box{display:flex;align-items:flex-start;gap:9px;border-radius:12px;padding:10px 11px;font-size:13px;font-weight:600;line-height:1.48}
+.hlp-box svg{width:17px;height:17px;flex:0 0 auto;margin-top:1px}
+.hlp-box b{font-weight:800}
+.hlp-safe{background:var(--accent-soft)} .hlp-safe svg{color:var(--accent)}
+.hlp-warn{background:var(--y-soft)} .hlp-warn svg{color:var(--y-ink)} .hlp-warn b{color:var(--y-ink)}
+#helpDlg .dlg-actions{align-items:center}
+#helpDlg .dlg-actions button{min-height:44px;font:inherit;font-size:15px;font-weight:700}
+#helpBack{padding:0 6px}
+#helpClose{padding:0 18px}
 @media (prefers-reduced-motion:reduce){
-  .acc-sec,.acc-head .ic,.acc-head .chev,.tp-btn,.acc-sw,.acc-sw .ck,.thr-chip{transition:none}
+  .acc-sec,.acc-head .chev,.tp-btn,.acc-dot,.acc-sw .ck,.hlp,.hlp-ic,.hlp-head .chev{transition:none}
 }
 
-/* Backup-Erinnerung */
-.rem-int{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:.9rem}
-.rem-int input{width:60px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);text-align:center;font-size:1rem}
+/* Backup-Erinnerung (Hinweis-Leiste auf dem Dashboard) */
 .reminder{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--cat-y) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--cat-y) 45%,var(--border));border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:14px}
 .reminder .ic{width:22px;height:22px;color:var(--cat-y);flex:0 0 auto}
 .rem-msg{flex:1;min-width:150px;font-size:.9rem}
