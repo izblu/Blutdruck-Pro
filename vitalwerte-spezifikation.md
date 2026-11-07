@@ -1,6 +1,6 @@
 # Vitalwerte – Datenspezifikation
 
-Stand: 2026-11-04. Diese Datei beschreibt **was** die App bei Körpertemperatur und
+Stand: 2026-11-04, ergänzt 2026-11-07 (Ziffern-Logik, Dashboard, Zielbereich, großes +). Diese Datei beschreibt **was** die App bei Körpertemperatur und
 Sauerstoffsättigung (SpO₂) rechnet, speichert und anzeigt – nicht wie es aussieht. Gleiche
 Aufteilung wie die [dashboard-spezifikation.md](dashboard-spezifikation.md):
 
@@ -52,12 +52,32 @@ Temperatur und Sauerstoff haben je **ein Feld**. Gespeichert wird immer erst per
 | Beispiele | `368` → 36,8 · `370` → 37,0 | `98` → 98 · `100` → 100 · `101` gesperrt |
 
 - **Prüf-Hinweis** wie beim Blutdruck („Ungewöhnlicher Wert – bitte prüfen."), wenn der Wert außerhalb
-  des plausiblen Bereichs liegt. Er erscheint erst, wenn genug Ziffern da sind, und verhindert das
+  des plausiblen Bereichs liegt. Er erscheint erst, wenn der Wert vollständig ist, und verhindert das
   Speichern nicht.
 - **Einzige Sperre:** Sauerstoff über 100 % ist unmöglich und lässt sich nicht speichern.
 - **Bearbeiten:** Der Wert wird wieder in Ziffern zerlegt. Vorsicht: `String(37.0)` ergibt `"37"`.
   Deshalb über `Math.round(value*10)` gehen, sonst wird aus 37,0 beim Bearbeiten etwas Falsches.
 - **Der Typ lässt sich nicht ändern:** Eine Temperatur bleibt beim Bearbeiten eine Temperatur.
+
+### 1.1 Ziffern-Logik (alle Werte, auch Blutdruck)
+
+Wunsch des Nutzers (Kommentar auf der Zeichenfläche, 2026-11-06). Der Ziffernblock erkennt selbst, ob ein Wert zwei
+oder drei Stellen hat, und springt danach ohne Tippen auf „Weiter" zum nächsten Feld.
+
+| Feld | Drei Stellen, wenn die erste Ziffer … | sonst | Prüf-Hinweis außerhalb von |
+|---|---|---|---|
+| Systolisch | 1 oder 2 ist (100–299) | zwei Stellen | 70–250 |
+| Diastolisch | 1 ist (100–199) | zwei Stellen | 40–140 |
+| Puls | 1 ist (100–199) | zwei Stellen | 35–200 |
+| Sauerstoff | 1 ist (100) | zwei Stellen | 70–100 (über 100 gesperrt) |
+| Temperatur | immer drei Stellen | – | 34–43 |
+
+- **0 als erste Ziffer wird ignoriert.** Mehr Ziffern als vorgesehen lassen sich nicht eintippen.
+- **Vollständig → automatisch weiter** zum nächsten Feld. Beim letzten Feld bleibt die Eingabe stehen, gespeichert wird
+  nur per Knopf.
+- **Ampel erst bei vollständigem Wert.** Vorher (z. B. bei „1") steht weder Farbe noch Ampel-Wort da.
+- **Der Prüf-Hinweis sperrt nichts** (einzige Sperre bleibt Sauerstoff über 100 %).
+- Gilt auch für den bisherigen Blutdruck: `capPressDigit` sprang früher erst nach drei Ziffern weiter.
 
 ---
 
@@ -84,13 +104,15 @@ Sie liefert Farbe **und** Text, weil Gelb bei der Temperatur zwei Bedeutungen ha
 **Prüfwerte an den Grenzen:** 35,9 Niedrig · 36,0 Normal · 37,4 Normal · 37,5 Erhöht · 38,0 Erhöht ·
 38,1 Fieber · 95 Im Ziel · 94 Niedrig · 93 Niedrig · 92 Zu niedrig.
 
-**Zielbereich (Menü → Anzeige):**
+**Zielbereich (Menü → Zielbereich, eigener Abschnitt seit 2026-11-07):**
 
-- Neue Ampel-Chips für alle fünf Grenzen. Eine Änderung wirkt sofort überall.
+- Je Wert eine Ampel-Leiste, darunter die Grenzen als Eingabe-Chips an den Übergängen, zusammen **neun Grenzen**
+  (Sys 2, Dia 2, Temperatur 3, Sauerstoff 2). Jede Zahl gehört zum Bereich rechts davon („ab"). Eine Änderung wirkt
+  sofort überall.
 - Temperatur-Felder als Textfeld mit `inputmode="decimal"`. Komma und Punkt zählen beide, damit das
   Komma der iPhone-Tastatur sicher ankommt.
-- Die Reihenfolge muss stimmen: `tempLow < tempY < tempR` und `spo2Y < spo2G ≤ 100`. Sonst wird die
-  Eingabe nicht übernommen.
+- Die Reihenfolge muss stimmen, **auch beim Blutdruck**: `sysY < sysR`, `diaY < diaR`, `tempLow < tempY < tempR` und
+  `spo2Y < spo2G ≤ 100`. Sonst wird die Eingabe nicht übernommen (rote Zeile, beim Verlassen zurück auf den alten Wert).
 - „Standardwerte wiederherstellen" setzt wie bisher alle Grenzen zurück, also auch die neuen.
 
 **Noch nicht abgesichert, nicht als Tatsache darstellen:** Das sind gängige Richtwerte. Die
@@ -105,22 +127,22 @@ bleiben gelb „Niedrig", unter 34 kommt der Prüf-Hinweis dazu.
 
 ## 3. Dashboard
 
-Zwei neue Bereiche, je Wert einer. Die vorhandenen Blutdruck-Kennzahlen und der Ampel-Ring (nur Blutdruck) bleiben.
+Neu aufgebaut („Letzte Messung + 7 Tage", Entwurf vom 2026-11-06, Nutzer: „erstmal fertig"). Alle vier Werte im
+selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikation.md). Der Ampel-Ring entfällt.
 
 ### 3.1 Kennzahlen je Wert
-- **Letzter Wert:** Zahl mit Einheit, Ampel (Farbe + Text), Zeitpunkt (`relTime`).
-- **Ø 7 Tage:** Temperatur auf eine Nachkommastelle, Sauerstoff ganzzahlig.
-- **Trend zur Vorwoche:** gerundeter Ø (7 Tage) minus gerundeter Ø (Vorwoche), wie beim Blutdruck.
-  Bei der Temperatur in Zehnteln rechnen, damit 36,8 − 36,6 genau `0,2` ergibt.
-- **Neutral:** Ø und Trend ohne Ampelfarbe, der Pfeil wertet nicht. Nur der letzte Wert trägt die Ampel.
+- **Letzte Messung:** eigene Karte je Wert (Blutdruck + Puls · Temperatur · Sauerstoff). Zahl mit Einheit in
+  Ampelfarbe, Ampel-Punkt und Ampel-Wort, Zeitpunkt relativ (`relTime`).
+- **Ø 7 Tage** (rollierend, 168 h, fest): Temperatur auf eine Nachkommastelle, Sauerstoff ganzzahlig. **Erst ab 3
+  Messungen.** Der Ø trägt Ampelfarbe und Ampel-Wort (`catMetric` auf dem gerundeten Ø).
+- **Kein Trend, keine Anzahl „im Ziel", keine Grafik** (Verläufe gehören in den Tab „Diagramm").
 
 ### 3.2 Leerzustände
 | Lage | Anzeige |
 |---|---|
-| Noch kein Wert dieses Typs | „–" und kurzer Hinweis, dass noch kein Wert erfasst ist |
-| Letzter Wert älter als 7 Tage | Letzter Wert bleibt sichtbar, Ø „–", kein Trend |
-| Nur eines der beiden Fenster hat Werte | Ø falls vorhanden, kein Trend |
-| Keine Blutdruck-Werte, aber Temperatur oder Sauerstoff | Neue Bereiche normal, Blutdruck-Bereich mit Leerzustand |
+| Noch kein Wert dieses Typs | Karte „Letzte Messung" mit „Noch kein Wert" |
+| 1–2 Messungen in 7 Tagen | „Zu wenige Messungen · Ø erst ab 3 Messungen" |
+| Keine Messung in 7 Tagen | „Keine Messung in den letzten 7 Tagen", die letzte Messung bleibt oben sichtbar |
 | Gar keine Werte | Wie bisher „Noch keine Messung erfasst." |
 
 ---
@@ -194,7 +216,8 @@ Zwei neue Bereiche, je Wert einer. Die vorhandenen Blutdruck-Kennzahlen und der 
 | Pro-Backup nur mit neuen Werten → alte App | Meldung „ungültige Datei", nichts geht kaputt |
 
 **Achtung Android:** Beim automatischen Backup nie dieselbe Datei in beiden Apps verknüpfen. Die alte App würde
-sie sonst ohne Temperatur und Sauerstoff überschreiben. Dieser Hinweis kommt in die Anleitung.
+sie sonst ohne Temperatur und Sauerstoff überschreiben. Dieser Hinweis steht in der Anleitung **und im Menü** (Karte
+„Automatisches Backup", immer wenn das automatische Backup verfügbar ist).
 
 ### 6.4 Löschen
 „Alle Daten löschen" löscht auch `vitals`, die Meldungen zählen alle Werte zusammen.
@@ -224,13 +247,21 @@ Die Details kommen in die [arzt-report-spezifikation.md](arzt-report-spezifikati
 
 ---
 
-## 9. Das große + (Design entscheidet)
+## 9. Das große + (alle drei wählbar)
 
-Drei Varianten, Entscheidung nach den Mockups: **A** Auswahl-Blatt · **B** Direkt mit Umschalter · **C** Alles in einem Durchgang.
+Entschieden 2026-11-07: Alle drei Varianten sind wählbar unter Menü → „Anzeige" → „Neue Messung (Plus-Button)",
+**Standard C**. Vorliebe `settings.plusMode` (`'a'|'b'|'c'`, fehlend oder unbekannt → `'c'`), kommt ins Backup.
 
-**Das Datenmodell bleibt bei allen gleich.** Bearbeiten öffnet immer nur die Felder des einen Datensatzes. Falls C gewählt wird:
-Jeder ausgefüllte Wert wird ein eigener Datensatz mit gleichem `ts`, leere Felder erzeugen keinen Datensatz, und die Notiz gilt für alle in
-diesem Durchgang angelegten Datensätze.
+| | Name im Menü | Ablauf |
+|---|---|---|
+| A | Erst wählen | Auswahl-Blatt Blutdruck · Temperatur · Sauerstoff, danach die Eingabe |
+| B | Direkt starten | Eingabe Blutdruck, oben ein Umschalter zu Temperatur und Sauerstoff |
+| C | Alles nacheinander | Sys → Dia → Puls → Temperatur → Sauerstoff, was fehlt, wird übersprungen |
+
+**Das Datenmodell bleibt bei allen gleich.** Bearbeiten öffnet immer nur die Felder des einen Datensatzes. Bei C:
+Jeder ausgefüllte Wert wird ein eigener Datensatz mit gleichem `ts`, leere Felder erzeugen keinen Datensatz, und die
+Notiz wird in alle in diesem Durchgang angelegten Datensätze kopiert. Systolisch und Diastolisch gehören zusammen;
+der Puls lässt sich in C überspringen (der Blutdruck-Datensatz hat dann `pulse:null`).
 
 Neue Blätter müssen über `navPush` laufen und in `NAV_SHEETS` stehen, damit der Android-Zurück-Knopf funktioniert.
 
@@ -267,8 +298,8 @@ Fahrenheit · gemeinsames Diagramm aller Werte.
 
 | Fix (im Code) | Offen (mit Claude Design) |
 |---|---|
-| Datenmodell, Speicher, Backup | Das große + (A, B oder C) |
-| Eingabe-Regeln, Plausibilität, Sperre | Aussehen von Eingabe und Vorschau |
+| Datenmodell, Speicher, Backup | Aussehen des großen + (A, B, C wählbar, Standard C) |
+| Eingabe-Regeln, Ziffern-Logik, Plausibilität, Sperre | Aussehen von Eingabe und Vorschau |
 | Berechnung, Zeitfenster, Rundung | Anordnung und Größe der neuen Dashboard-Bereiche |
 | Ampel-Regeln und Grenzen | Farben und Schrift im Rahmen der Tokens ([arzt-report-spezifikation.md](arzt-report-spezifikation.md), Abschnitt 8) |
 | Leerzustände (Regeln) | Genaue Text-Formulierungen |

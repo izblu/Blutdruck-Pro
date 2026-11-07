@@ -55,30 +55,37 @@
         </button>
       </div>
 
+      <!-- Variante B des großen +: oben zwischen den Werten wechseln -->
+      <div class="cap-switch" id="capSwitch" role="group" aria-label="Was möchtest du erfassen?" hidden>
+        <button type="button" data-m="bp">Blutdruck</button>
+        <button type="button" data-m="temp">Temperatur</button>
+        <button type="button" data-m="spo2">Sauerstoff</button>
+      </div>
+
       <div class="cap-mid">
-        <div class="cap-progress" id="capProgress">
-          <span data-i="0"></span><span data-i="1"></span><span data-i="2"></span>
-        </div>
+        <!-- Fortschrittsbalken und Kacheln baut app.js je nach Feldliste (capBuildTiles) -->
+        <div class="cap-progress" id="capProgress"></div>
         <div class="cap-center">
           <div class="cap-big-row"><span class="cap-big tnum" id="capBig"></span><span class="caret"></span></div>
           <div class="cap-unit" id="capUnit">SYSTOLISCH · mmHg</div>
+          <div class="cap-cur" id="capPill"></div>
         </div>
       </div>
 
-      <div class="cap-seg">
-        <div class="cap-seg-inner">
+      <div class="cap-seg" id="capSeg">
+        <div class="cap-seg-inner" id="capTiles">
           <div class="cap-ink" id="capInk"></div>
-          <div class="cap-tile" data-i="0"><div class="cap-tile-pill"></div><div class="cap-tile-box"><div class="cap-tile-seg">SYS</div><div class="cap-tile-val tnum">––</div></div></div>
-          <div class="cap-tile" data-i="1"><div class="cap-tile-pill"></div><div class="cap-tile-box"><div class="cap-tile-seg">DIA</div><div class="cap-tile-val tnum">––</div></div></div>
-          <div class="cap-tile" data-i="2"><div class="cap-tile-pill"></div><div class="cap-tile-box"><div class="cap-tile-seg">PULS</div><div class="cap-tile-val tnum">––</div></div></div>
         </div>
       </div>
-      <div class="cap-hint" id="capHint"></div>
+      <div class="cap-hint" id="capHint" aria-live="polite"></div>
 
       <div class="cap-pad">
         <div class="cap-acc">
           <button class="cap-note-btn" id="capNoteBtn" type="button">+ Notiz</button>
-          <button class="cap-next" id="capNext" type="button">Weiter</button>
+          <div class="cap-acc-r">
+            <button class="cap-skip" id="capSkip" type="button" hidden>Überspringen</button>
+            <button class="cap-next" id="capNext" type="button">Weiter</button>
+          </div>
         </div>
         <div class="cap-keys" id="capKeys">
           <button class="cap-key" data-k="1" type="button">1</button>
@@ -133,13 +140,13 @@
         <div class="vh-sub" id="vhSub">—</div>
       </div>
     </div>
-    <div class="vh-colh">
-      <span class="vh-c-date">DATUM</span>
-      <span class="vh-c-n">SYS</span>
-      <span class="vh-c-n">DIA</span>
-      <span class="vh-c-p">PULS</span>
-      <span class="vh-c-chev"></span>
+    <!-- Umschalter Blutdruck · Temperatur · Sauerstoff (gleicher Zustand wie im Diagramm) -->
+    <div class="metric-seg" role="group" aria-label="Wert wählen">
+      <button type="button" data-metric="bp">Blutdruck</button>
+      <button type="button" data-metric="temp">Temperatur</button>
+      <button type="button" data-metric="spo2">Sauerstoff</button>
     </div>
+    <div class="vh-colh" id="vColh"></div>
     <div class="vh-scroll">
       <div id="vList"></div>
       <div class="vh-empty" id="vEmpty" hidden></div>
@@ -178,10 +185,16 @@
       <button class="dg-report" id="rpOpenChart" type="button" aria-label="Arzt-Report">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></button>
     </div>
+    <div class="metric-seg" role="group" aria-label="Wert wählen">
+      <button type="button" data-metric="bp">Blutdruck</button>
+      <button type="button" data-metric="temp">Temperatur</button>
+      <button type="button" data-metric="spo2">Sauerstoff</button>
+    </div>
     <!-- Karte (Wert/Status + SVG-Grafik + Legende) · Statistik · Kontext füllt renderChart() -->
     <div class="dg-body" id="dgBody"></div>
     <!-- Steuerleiste unten (über der Tab-Bar): Reihe · Puls · Zeitraum -->
     <div class="dg-controls">
+      <span class="dg-range-lbl" id="dgRangeLbl"></span>
       <div class="dg-seg" id="dgSeg" role="group" aria-label="Reihe wählen">
         <button class="dg-seg-btn" data-s="sys" type="button">Sys</button>
         <button class="dg-seg-btn" data-s="dia" type="button">Dia</button>
@@ -240,6 +253,24 @@
     <div class="rs-row"><label for="rsFrom">Von</label><input type="date" id="rsFrom"></div>
     <div class="rs-row"><label for="rsTo">Bis</label><input type="date" id="rsTo"></div>
     <button class="cap-sheet-apply" id="rsApply" type="button">Übernehmen</button>
+  </div>
+</div>
+
+<!-- Großes +, Variante A „Erst wählen": Auswahl-Blatt (läuft über navPush, steht in NAV_SHEETS) -->
+<div class="sheet" id="plusSheet" hidden>
+  <div class="sheet-scrim" data-act="close"></div>
+  <div class="sheet-panel plus-panel" role="dialog" aria-labelledby="plusTitle">
+    <div class="cap-sheet-grab"></div>
+    <div class="cap-sheet-title" id="plusTitle">Was möchtest du erfassen?</div>
+    <button class="plus-opt" data-m="bp" type="button">
+      <span class="plus-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h5l2.5-7 3 14 2.5-9 2 2h3"/></svg></span>
+      <span class="plus-txt"><b>Blutdruck</b><span>Systolisch, diastolisch und Puls</span></span></button>
+    <button class="plus-opt" data-m="temp" type="button">
+      <span class="plus-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z"/></svg></span>
+      <span class="plus-txt"><b>Temperatur</b><span>Körpertemperatur in °C</span></span></button>
+    <button class="plus-opt" data-m="spo2" type="button">
+      <span class="plus-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17a4 4 0 1 0 8 0a4 4 0 1 0-8 0M13.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0-5.6 0M8.1 7.5a1.9 1.9 0 1 0 3.8 0a1.9 1.9 0 1 0-3.8 0M13.8 4a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0-2.4 0"/></svg></span>
+      <span class="plus-txt"><b>Sauerstoff</b><span>Sauerstoffsättigung (SpO₂) in %</span></span></button>
   </div>
 </div>
 
@@ -411,6 +442,7 @@
 <!-- Druck-Container: hält die A4-Seite(n) in Naturgröße; nur im Ausdruck sichtbar (@media print). -->
 <div id="reportPrint" aria-hidden="true"></div>
 
+<script src="./vitals.js" defer></script>
 <script src="./app.js" defer></script>
 </body>
 </html>

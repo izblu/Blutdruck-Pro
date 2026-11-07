@@ -117,12 +117,12 @@ function askConfirm(opts){
 /* ---------- Speicherung ---------- */
 const LS_KEY='bpp_entries', LS_SET='bpp_settings';
 const SET_DEFAULT={colorDots:true,guideLines:true,theme:'auto',accent:'kobalt',
-  reminderDays:3,firstDirtyAt:null,snoozeUntil:0,
-  thr:{sysY:130,sysR:140,diaY:85,diaR:90}};
+  reminderDays:3,firstDirtyAt:null,snoozeUntil:0,plusMode:'c',
+  thr:{sysY:130,sysR:140,diaY:85,diaR:90,...VITAL_THR_DEFAULT}};   // Temperatur/Sauerstoff-Grenzen aus vitals.js
 
 /* IndexedDB ist der robuste Hauptspeicher (überlebt Speicherdruck/ITP deutlich besser
    als localStorage und fasst viel mehr Daten). localStorage bleibt als Spiegel/Fallback. */
-const DB_NAME='blutdruck-pro', DB_VER=1, STORE_E='entries', STORE_M='meta';
+const DB_NAME='blutdruck-pro', DB_VER=2, STORE_E='entries', STORE_M='meta';   // Version 2: Store 'vitals' (STORE_V, vitals.js)
 let _db=null;
 function openDB(){
   return new Promise((res,rej)=>{
@@ -132,6 +132,7 @@ function openDB(){
       const db=rq.result;
       if(!db.objectStoreNames.contains(STORE_E)) db.createObjectStore(STORE_E,{keyPath:'id'});
       if(!db.objectStoreNames.contains(STORE_M)) db.createObjectStore(STORE_M); // für Backup-Datei-Handle
+      if(!db.objectStoreNames.contains(STORE_V)) db.createObjectStore(STORE_V,{keyPath:'id'}); // Temperatur & Sauerstoff
     };
     rq.onsuccess=()=>res(rq.result);
     rq.onerror=()=>rej(rq.error);
@@ -216,8 +217,10 @@ async function initStorage(){
       entries=fromLs;
       if(fromLs.length) await idbWriteAll(fromLs);
     }
+    await initVitalsStorage();             // Temperatur & Sauerstoff (vitals.js)
   }catch{
     entries=loadEntries();                  // kompletter Fallback ohne IndexedDB
+    vitals=loadVitals();
   }
 }
 
@@ -225,9 +228,7 @@ function addEntry(e){ entries.push(e); saveEntries(); markDirty(); }
 function updateEntry(id,patch){ const i=entries.findIndex(x=>x.id===id); if(i>=0){entries[i]={...entries[i],...patch};saveEntries();markDirty();} }
 function removeEntry(id){ entries=entries.filter(x=>x.id!==id); saveEntries(); markDirty(); }
 
-/* ---------- Plausibilitäts-Bereiche (nur zur Warnung, blockieren nicht) ---------- */
-const RANGES={sys:[70,260],dia:[40,160],pulse:[30,220]};
-const inRange=(v,[a,b])=>v!=null&&v>=a&&v<=b;
+/* Plausibilitäts-Bereiche (nur zur Warnung, blockieren nicht) stehen jetzt je Feld in CAP_DEF (vitals.js). */
 
 /* ---------- Filter (geteilt von Verlauf + Diagramm) ---------- */
 const filters={from:'',to:'',sysMin:'',sysMax:'',diaMin:'',diaMax:'',pulMin:'',pulMax:'',note:''};
@@ -265,17 +266,18 @@ const CAT_BAR ={g:'var(--g-bar)', y:'var(--y-bar)', r:'var(--r-bar)', n:'var(--m
 const CAT_LABEL={g:'Im Ziel', y:'Erhöht', r:'Zu hoch', n:'–'};
 
 /* ---------- Erfassen (geführte Eingabe) ----------
-   Ein Feld nach dem anderen (Sys → Dia → Puls) über einen eigenen Ziffernblock: große Vorschauzahl,
-   Segment-Kacheln mit Ampel-Rückmeldung (catVal), Fortschrittspunkte, Datum/Uhrzeit- und Notiz-Sheet.
-   Speichert über addEntry (neu) bzw. updateEntry (Bearbeiten). Nachbau des Designs – Datenlogik unverändert. */
-const CAP_FIELDS=[{seg:'SYS',name:'Systolisch',unit:'mmHg',key:'sys'},
-                  {seg:'DIA',name:'Diastolisch',unit:'mmHg',key:'dia'},
-                  {seg:'PULS',name:'Puls',unit:'bpm',key:'pulse'}];
+   Ein Feld nach dem anderen über einen eigenen Ziffernblock: große Vorschauzahl, Segment-Kacheln mit
+   Ampel-Rückmeldung, Fortschrittsbalken, Datum/Uhrzeit- und Notiz-Sheet. Feldliste je Art (CAP_MODES):
+   'bp' Sys → Dia → Puls · 'temp' · 'spo2' · 'alle' = alles nacheinander (großes +, Variante C).
+   Ziffern-Logik (2 oder 3 Stellen, 0 am Anfang ignorieren), Ampel und Prüf-Hinweise je Feld: vitals.js.
+   Speichert über addEntry/addVital (neu) bzw. updateEntry/updateVital (Bearbeiten). */
+const CAP_MODES={bp:['sys','dia','pulse'],temp:['temp'],spo2:['spo2'],alle:['sys','dia','pulse','temp','spo2']};
 /* Rahmenfarbe der „erledigten" Kachel (weiches Ampel-Linien-Pendant zu CAT_SOFT/-BAR). */
 const CAT_LINE={g:'color-mix(in srgb,var(--g-bar) 34%,var(--line))',
                 y:'color-mix(in srgb,var(--y-bar) 34%,var(--line))',
                 r:'color-mix(in srgb,var(--r-bar) 34%,var(--line))', n:'var(--line)'};
-const cap={f:['','',''],step:0,editing:false,editId:null,note:'',date:new Date(),returnTab:'dashboard',dtView:{y:0,m:0},saving:false};
+const cap={mode:'bp',fields:CAP_MODES.bp,f:{},step:0,switcher:false,editing:false,editKind:null,editId:null,pulseOptional:false,
+  note:'',date:new Date(),returnTab:'dashboard',dtView:{y:0,m:0},saving:false,built:''};
 
 const WD_SHORT=['So','Mo','Di','Mi','Do','Fr','Sa'];
 const MO_FULL=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -292,87 +294,198 @@ function capDateLabel(d){
 }
 function capSyncDateChip(){ $('#capDateLabel').textContent=capDateLabel(cap.date); }
 
-/* Öffnen. entry gesetzt → Bearbeiten-Modus; sonst neue Messung. returnTab = Ziel beim Schließen/Speichern. */
-function startCapture(entry,returnTab){
-  cap.returnTab=returnTab||'dashboard'; cap.saving=false; cap.step=0;
-  if(entry){
-    cap.editing=true; cap.editId=entry.id;
-    cap.f=[String(entry.sys),String(entry.dia),String(entry.pulse)];
-    cap.note=entry.note||''; cap.date=new Date(entry.ts);
+/* Öffnen. opts: {mode:'bp'|'temp'|'spo2'|'alle', switcher:true (Variante B)} für eine neue Messung,
+   {entry} bzw. {vital} zum Bearbeiten. returnTab = Ziel beim Schließen/Speichern. */
+function startCapture(opts,returnTab){
+  opts=opts||{};
+  cap.returnTab=returnTab||'dashboard'; cap.saving=false; cap.step=0; cap.f={};
+  cap.editing=false; cap.editKind=null; cap.editId=null; cap.pulseOptional=false; cap.switcher=false;
+  if(opts.entry){
+    const e=opts.entry;
+    cap.mode='bp'; cap.editing=true; cap.editKind='bp'; cap.editId=e.id;
+    cap.f={sys:valueRaw('sys',e.sys),dia:valueRaw('dia',e.dia),pulse:valueRaw('pulse',e.pulse)};
+    cap.pulseOptional=!Number.isFinite(e.pulse);          // Messung ohne Puls bleibt ohne Puls speicherbar
+    cap.note=e.note||''; cap.date=new Date(e.ts);
+  }else if(opts.vital){
+    const v=opts.vital;
+    cap.mode=v.type; cap.editing=true; cap.editKind='vital'; cap.editId=v.id;
+    cap.f={[v.type]:valueRaw(v.type,v.value)};
+    cap.note=v.note||''; cap.date=new Date(v.ts);
   }else{
-    cap.editing=false; cap.editId=null;
-    cap.f=['','','']; cap.note=''; cap.date=new Date();
+    cap.mode=CAP_MODES[opts.mode]?opts.mode:'bp'; cap.switcher=!!opts.switcher;
+    cap.note=''; cap.date=new Date();
   }
+  cap.fields=CAP_MODES[cap.mode];
   $('#capTitle').textContent=cap.editing?'Messung bearbeiten':'Neue Messung';
   $('#capSave').hidden=true; $('#capDtSheet').hidden=true; $('#capNoteSheet').hidden=true;
   capSyncDateChip(); capUpdate();
-  navPush('capture',null);
+  // Aus dem Auswahl-Blatt (Variante A) heraus: das Blatt durch die Eingabe ERSETZEN (sonst käme es beim Zurück wieder)
+  const top=viewStack[viewStack.length-1];
+  if(top&&top.sheet==='#plusSheet') navReplace('capture',null); else navPush('capture',null);
+}
+/* Variante B: oben zwischen Blutdruck, Temperatur und Sauerstoff wechseln (Eingaben je Feld bleiben erhalten). */
+function capSetMode(m){ if(!CAP_MODES[m]||m===cap.mode) return; cap.mode=m; cap.fields=CAP_MODES[m]; cap.step=0; capUpdate(); }
+
+/* Lässt sich das Feld leer übergehen? Nur im Durchgang C (Sys leer = ganzer Blutdruck übersprungen;
+   Dia nur, wenn Sys leer ist) und beim Bearbeiten einer Messung, die keinen Puls hatte. */
+function capOptional(key){
+  if(cap.mode==='alle'){
+    if(key==='dia') return !(cap.f.sys||'');
+    return true;
+  }
+  return key==='pulse'&&cap.pulseOptional;
+}
+/* Was beim Speichern entstünde: {recs:[…], err:'', ok}. Systolisch und Diastolisch gehören zusammen. */
+function capRecords(){
+  const g=k=>cap.f[k]||'', has=k=>cap.fields.includes(k), recs=[]; let err='';
+  if(has('sys')){
+    const s=g('sys'), d=g('dia'), p=g('pulse');
+    if(cap.mode!=='alle'||s||d||p){
+      if(!rawComplete('sys',s)||!rawComplete('dia',d)) err='Bitte Systolisch und Diastolisch eingeben.';
+      else if(p&&!rawComplete('pulse',p)) err='Bitte den Puls vollständig eingeben.';
+      else if(!p&&!capOptional('pulse')) err='Bitte den Puls eingeben.';
+      else recs.push({kind:'bp',sys:rawValue('sys',s),dia:rawValue('dia',d),pulse:p?rawValue('pulse',p):null});
+    }
+  }
+  ['temp','spo2'].forEach(k=>{
+    if(!has(k)) return;
+    const r=g(k);
+    if(!r){ if(cap.mode!=='alle') err=err||'Bitte einen Wert eingeben.'; return; }
+    if(spo2Over(k,r)) err=err||'Über 100 % ist nicht möglich.';
+    else if(!rawComplete(k,r)) err=err||(k==='temp'?'Bitte drei Ziffern eingeben, z. B. 368 für 36,8 °C.':'Bitte den Wert vollständig eingeben.');
+    else recs.push({kind:k,value:rawValue(k,r)});
+  });
+  if(!err&&!recs.length) err='Noch kein Wert eingegeben.';
+  return {recs,err,ok:!err};
+}
+
+/* Kacheln + Fortschrittsbalken passend zur Feldliste neu aufbauen (nur wenn sich die Liste ändert). */
+function capBuildTiles(){
+  const n=cap.fields.length, compact=n>3;
+  $('#capProgress').innerHTML=cap.fields.map((k,i)=>'<span data-i="'+i+'"></span>').join('');
+  $$('#capTiles .cap-tile').forEach(t=>t.remove());
+  $('#capTiles').insertAdjacentHTML('beforeend',cap.fields.map((k,i)=>
+    '<button type="button" class="cap-tile" data-i="'+i+'"><span class="cap-tile-pill"></span><span class="cap-tile-box">'
+    +'<span class="cap-tile-seg">'+CAP_DEF[k].seg+'</span><span class="cap-tile-val tnum">––</span></span></button>').join(''));
+  $('#capSeg').classList.toggle('compact',compact);
+  const gap=compact?6:8, w='((100% - '+((n-1)*gap)+'px) / '+n+')';
+  $('#capInk').style.width='calc'+w;
+  cap.gap=gap; cap.w=w; cap.built=cap.fields.join();
 }
 
 /* Alles Sichtbare an den Zustand angleichen (Zahl, Einheit, Fortschritt, Kacheln, Knöpfe, Hinweis). */
 function capUpdate(){
-  const i=cap.step, raw=cap.f[i], cfg=CAP_FIELDS[i];
-  $('#capBig').textContent=raw;
-  $('#capUnit').textContent=cfg.name.toUpperCase()+' · '+cfg.unit;
-  $$('#capProgress span').forEach(s=>{ const k=+s.dataset.i;
-    s.classList.toggle('active',k===i);
-    s.classList.toggle('filled',k!==i&&cap.f[k].length>0); });
-  $$('#tab-capture .cap-tile').forEach(t=>{
-    const k=+t.dataset.i, r=cap.f[k], has=r.length>0, active=k===i, done=has&&!active&&k<2;
-    const cat=done?catValFor(CAP_FIELDS[k].key,parseInt(r,10)):null;
-    t.classList.toggle('active',active); t.classList.toggle('empty',!has);
-    const box=t.querySelector('.cap-tile-box'), seg=t.querySelector('.cap-tile-seg'),
-          val=t.querySelector('.cap-tile-val'), pill=t.querySelector('.cap-tile-pill');
-    val.textContent=has?r:'––';
-    if(done){
-      box.style.background=CAT_SOFT[cat]; box.style.borderColor=CAT_LINE[cat];
-      seg.style.color=CAT_INK[cat]; val.style.color=CAT_INK[cat];
-      pill.innerHTML='<span class="cap-pill" style="background:'+CAT_SOFT[cat]+';color:'+CAT_INK[cat]+'">'
-        +'<span class="d" style="background:'+CAT_BAR[cat]+'"></span>'+CAT_LABEL[cat]+'</span>';
-    }else{
-      box.style.background=''; box.style.borderColor=''; seg.style.color=''; val.style.color=''; pill.innerHTML='';
-    }
-  });
-  $('#capInk').style.left='calc('+i+' * (100% - 16px) / 3 + '+(8*i)+'px)';
-  const allFilled=cap.f.every(v=>v.length>0), last=i>=2, next=$('#capNext');
+  const n=cap.fields.length, i=Math.min(cap.step,n-1), key=cap.fields[i], raw=cap.f[key]||'', def=CAP_DEF[key];
+  const multi=n>1, last=i>=n-1;
+  if(cap.built!==cap.fields.join()) capBuildTiles();
+  const big=$('#capBig');
+  big.textContent=rawDisplay(key,raw); big.classList.toggle('over',spo2Over(key,raw));
+  $('#capUnit').textContent=def.name.toUpperCase()+' · '+def.unit;
+  const sw=$('#capSwitch'); sw.hidden=!cap.switcher;
+  $$('#capSwitch button').forEach(b=>{ const on=b.dataset.m===cap.mode; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  $('#capProgress').hidden=!multi; $('#capSeg').hidden=!multi;
+  if(multi){
+    $$('#capProgress span').forEach(s=>{ const k=+s.dataset.i;
+      s.classList.toggle('active',k===i);
+      s.classList.toggle('filled',k!==i&&(cap.f[cap.fields[k]]||'').length>0); });
+    $$('#capTiles .cap-tile').forEach(t=>{
+      const k=+t.dataset.i, fk=cap.fields[k], r=cap.f[fk]||'', has=r.length>0, active=k===i, done=has&&!active;
+      const fc=done?capFieldCat(fk,r):null, cat=fc?fc.c:(done&&spo2Over(fk,r)?'r':null);
+      t.classList.toggle('active',active); t.classList.toggle('empty',!has);
+      t.setAttribute('aria-label',CAP_DEF[fk].name+': '+(has?rawDisplay(fk,r):'leer'));
+      const box=t.querySelector('.cap-tile-box'), seg=t.querySelector('.cap-tile-seg'),
+            val=t.querySelector('.cap-tile-val'), pill=t.querySelector('.cap-tile-pill');
+      val.textContent=has?rawDisplay(fk,r):'––';
+      if(cat&&cat!=='n'){
+        box.style.background=CAT_SOFT[cat]; box.style.borderColor=CAT_LINE[cat];
+        seg.style.color=CAT_INK[cat]; val.style.color=CAT_INK[cat];
+        pill.innerHTML=fc?'<span class="cap-pill" style="background:'+CAT_SOFT[cat]+';color:'+CAT_INK[cat]+'">'
+          +'<span class="d" style="background:'+CAT_BAR[cat]+'"></span>'+fc.t+'</span>':'';
+      }else{
+        box.style.background=''; box.style.borderColor=''; seg.style.color=''; val.style.color=''; pill.innerHTML='';
+      }
+    });
+    $('#capInk').style.left='calc('+i+' * '+cap.w+' + '+(cap.gap*i)+'px)';
+  }
+  // Ampel des aktuellen Felds unter der großen Zahl – erst, wenn der Wert vollständig ist
+  const cc=capFieldCat(key,raw), cp=$('#capPill');
+  cp.innerHTML=cc&&cc.c!=='n'?'<span class="cap-pill lg" style="background:'+CAT_SOFT[cc.c]+';color:'+CAT_INK[cc.c]+'"><span class="d" style="background:'+CAT_BAR[cc.c]+'"></span>'+cc.t+'</span>':'';
+  // Hinweis: Sperre (über 100 %) > Prüf-Hinweis > (Durchgang C, letzter Schritt) was noch fehlt
+  const rec=capRecords();
+  let hint='', err=false;
+  if(cap.fields.some(k=>spo2Over(k,cap.f[k]||''))){ hint='Über 100 % ist nicht möglich.'; err=true; }
+  else if(cap.fields.some(k=>capFieldOdd(k,cap.f[k]||''))) hint='Ungewöhnlicher Wert – bitte prüfen.';
+  else if(cap.mode==='alle'&&last&&!rec.ok){ hint=rec.err; }
+  const h=$('#capHint'); h.textContent=hint; h.classList.toggle('err',err);
+  const next=$('#capNext');
   next.textContent=last?'Speichern':'Weiter';
-  next.disabled=last?!allFilled:raw.length===0;
-  let hint='';
-  for(let k=0;k<3;k++){ const v=cap.f[k]; if(v.length&&!inRange(parseInt(v,10),RANGES[CAP_FIELDS[k].key])){ hint='Ungewöhnlicher Wert – bitte prüfen.'; break; } }
-  $('#capHint').textContent=hint;
+  next.disabled=last?!rec.ok:!(rawComplete(key,raw)&&!spo2Over(key,raw));
+  $('#capSkip').hidden=last||raw.length>0||!capOptional(key);
   $('#capNoteBtn').textContent=cap.note.trim()?'✓ Notiz':'+ Notiz';
 }
 function capBump(){ const b=$('#capBig'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
 
 function capPressDigit(d){
-  const i=cap.step; if(cap.f[i].length>=3) return;
-  cap.f[i]+=d;
-  if(cap.f[i].length>=3&&i<2) cap.step=i+1;   // nach 3 Ziffern automatisch weiter
+  const key=cap.fields[cap.step], raw=cap.f[key]||'';
+  if(raw===''&&d==='0') return;                                 // 0 am Anfang ignorieren
+  if(raw.length>=3||raw.length>=digitTarget(key,raw)) return;   // nicht mehr Ziffern als vorgesehen
+  const nv=raw+d; cap.f[key]=nv;
+  // vollständig → automatisch zum nächsten Feld (beim letzten Feld bleibt die Eingabe stehen)
+  if(rawComplete(key,nv)&&!spo2Over(key,nv)&&cap.step<cap.fields.length-1) cap.step++;
   capUpdate(); capBump();
 }
 function capPressBack(){
-  const i=cap.step;
-  if(cap.f[i].length){ cap.f[i]=cap.f[i].slice(0,-1); capUpdate(); return; }
-  if(i>0){ cap.step=i-1; capUpdate(); }
+  const key=cap.fields[cap.step], raw=cap.f[key]||'';
+  if(raw.length){ cap.f[key]=raw.slice(0,-1); capUpdate(); return; }
+  if(cap.step>0){ cap.step--; capUpdate(); }
 }
-function capGoStep(i){ if(i!==cap.step){ cap.step=i; capUpdate(); } }
+function capGoStep(i){ if(i!==cap.step&&i>=0&&i<cap.fields.length){ cap.step=i; capUpdate(); } }
 function capNext(){
-  if(cap.step<2){ if(cap.f[cap.step].length===0) return; cap.step++; capUpdate(); }
+  const key=cap.fields[cap.step], raw=cap.f[key]||'';
+  if(cap.step<cap.fields.length-1){ if(!rawComplete(key,raw)||spo2Over(key,raw)) return; cap.step++; capUpdate(); }
   else capSave();
+}
+/* Überspringen (nur bei leeren, optionalen Feldern): leere Systolisch-Eingabe in C überspringt den ganzen Blutdruck. */
+function capSkip(){
+  const key=cap.fields[cap.step];
+  if(cap.mode==='alle'&&key==='sys') cap.step=cap.fields.indexOf('temp');
+  else cap.step=Math.min(cap.step+1,cap.fields.length-1);
+  capUpdate();
 }
 function capClose(){ if(!cap.saving) backToScreen(cap.returnTab); }
 function capSave(){
   if(cap.saving) return;
-  const sys=parseInt(cap.f[0],10), dia=parseInt(cap.f[1],10), pulse=parseInt(cap.f[2],10);
-  if(!Number.isFinite(sys)||!Number.isFinite(dia)||!Number.isFinite(pulse)) return;
+  const rec=capRecords(); if(!rec.ok) return;
   cap.saving=true;
-  const note=cap.note.trim();
-  if(cap.editing&&cap.editId) updateEntry(cap.editId,{ts:cap.date.toISOString(),sys,dia,pulse,note});
-  else addEntry({id:uid(),ts:cap.date.toISOString(),sys,dia,pulse,note});
+  const note=cap.note.trim(), ts=cap.date.toISOString();
+  if(cap.editing){
+    const r=rec.recs[0];
+    if(cap.editKind==='bp') updateEntry(cap.editId,{ts,sys:r.sys,dia:r.dia,pulse:r.pulse,note});
+    else updateVital(cap.editId,{ts,value:r.value,note});
+  }else{
+    // Durchgang C: jeder ausgefüllte Wert wird ein eigener Datensatz mit gleicher Zeit; die Notiz wird kopiert.
+    rec.recs.forEach(r=>{
+      if(r.kind==='bp') addEntry({id:uid(),ts,sys:r.sys,dia:r.dia,pulse:r.pulse,note});
+      else addVital({id:uid(),ts,type:r.kind,value:r.value,note});
+    });
+  }
   $('#capSave').hidden=false;                 // Häkchen-Overlay, dann Zielscreen
   const back=cap.returnTab;
   setTimeout(()=>{ $('#capSave').hidden=true; cap.saving=false; refreshData(); updateReminder(); backToScreen(back); },780);
 }
+
+/* ----- Großes + : Verhalten nach settings.plusMode (A Auswahl-Blatt · B direkt mit Umschalter · C alles nacheinander) ----- */
+function plusModeNow(){ return ['a','b','c'].includes(settings.plusMode)?settings.plusMode:'c'; }
+function openPlus(){
+  const m=plusModeNow();
+  if(m==='a') navPush(currentTab,'#plusSheet');
+  else if(m==='b') startCapture({mode:'bp',switcher:true});
+  else startCapture({mode:'alle'});
+}
+$('#plusSheet').addEventListener('click',ev=>{
+  if(ev.target.closest('[data-act=close]')){ closeSheet('#plusSheet'); return; }
+  const b=ev.target.closest('[data-m]'); if(b) startCapture({mode:b.dataset.m});
+});
 
 /* ----- Datum & Uhrzeit (Bottom-Sheet) ----- */
 function capOpenDt(){ cap.dtView={y:cap.date.getFullYear(),m:cap.date.getMonth()}; capRenderDt(); navPush('capture','#capDtSheet'); }
@@ -441,8 +554,10 @@ $('#capNext').addEventListener('click',capNext);
 $('#capClose').addEventListener('click',capClose);
 $('#capDateChip').addEventListener('click',capOpenDt);
 $('#capNoteBtn').addEventListener('click',capOpenNote);
-$$('#capProgress span').forEach(s=>s.addEventListener('click',()=>capGoStep(+s.dataset.i)));
-$$('#tab-capture .cap-tile').forEach(t=>t.addEventListener('click',()=>capGoStep(+t.dataset.i)));
+$('#capProgress').addEventListener('click',ev=>{ const s=ev.target.closest('span[data-i]'); if(s) capGoStep(+s.dataset.i); });
+$('#capTiles').addEventListener('click',ev=>{ const t=ev.target.closest('.cap-tile'); if(t) capGoStep(+t.dataset.i); });
+$('#capSkip').addEventListener('click',capSkip);
+$('#capSwitch').addEventListener('click',ev=>{ const b=ev.target.closest('[data-m]'); if(b) capSetMode(b.dataset.m); });
 $('#capDtPanel').addEventListener('click',ev=>{ const b=ev.target.closest('[data-act]'); if(!b||b.disabled) return;
   const a=b.dataset.act;
   if(a==='close') capCloseDt();
@@ -468,58 +583,83 @@ document.addEventListener('keydown',ev=>{
   else if(ev.key==='Escape'){ capClose(); }
 });
 
-/* ---------- Tabelle ---------- */
 /* ---------- Verlauf (Liste) ----------
-   Chronologische Liste (neu, ersetzt die alte Tabelle). Sys und Dia je in ihrer eigenen Ampelfarbe
-   (catVal), Zeilenpunkt = der schlechtere von beiden. Zeitraum unten: 7/30/90 Tage + „Zeitraum"
-   (Von–Bis-Sheet). Zeile antippen → Detail-Screen. Nutzt die geteilte Filter-Basis (filters → getFiltered). */
+   Chronologische Liste. Oben der Umschalter Blutdruck · Temperatur · Sauerstoff (viewMetric, flüchtig,
+   geteilt mit dem Diagramm, startet bei Blutdruck). Blutdruck: Sys und Dia je in ihrer eigenen Ampelfarbe
+   (catVal), Zeilenpunkt = der schlechtere. Temperatur/Sauerstoff: Wert in Ampelfarbe (catMetric).
+   Zeitraum unten: 7/30/90 Tage + „Zeitraum" (Von–Bis-Sheet). Zeile antippen → Detail-Screen. */
 let verlaufRange='30';
+let viewMetric='bp';                       // 'bp' | 'temp' | 'spo2' – gilt für Verlauf UND Diagramm
 const RANK={n:0,g:1,y:2,r:3};
 const worseCat=(a,b)=>RANK[b]>RANK[a]?b:a;
 const IC_CHEV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
 const IC_NOTE_SM='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14M5 10h14M5 15h8"/></svg>';
+const RANGE_LABEL={'7':'Letzte 7 Tage','30':'Letzte 30 Tage','90':'Letzte 90 Tage','custom':'Eigener Zeitraum'};
 
 /* 7/30/90 → filters.from/to setzen; 'custom' behält die im Zeitraum-Sheet gewählten Werte. */
 function applyVerlaufRange(){
   const k=verlaufRange;
   if(k==='7'||k==='30'||k==='90'){ filters.from=new Date(Date.now()-(+k)*864e5).toISOString().slice(0,10); filters.to=''; }
 }
+/* Temperatur/Sauerstoff im gemeinsamen Zeitraum (nur filters.from/to – die Wertefilter gelten hier nicht). */
+function getFilteredVitals(type){
+  const lo=filters.from?new Date(filters.from+'T00:00:00').getTime():-Infinity;
+  const hi=filters.to?new Date(filters.to+'T23:59:59').getTime():Infinity;
+  return vitalsOf(type).filter(v=>{ const t=new Date(v.ts).getTime(); return t>=lo&&t<=hi; });
+}
+/* Umschalter-Zustand in Verlauf und Diagramm angleichen. */
+function syncMetricSeg(){
+  $$('.metric-seg button').forEach(b=>{ const on=b.dataset.metric===viewMetric; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+}
+const vDate=d=>WD_SHORT[d.getDay()]+', '+pad2(d.getDate())+'.'+pad2(d.getMonth()+1)+'.';
 function renderTable(){
-  applyVerlaufRange();
-  const list=getFiltered().slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  const rangeLabel={'7':'Letzte 7 Tage','30':'Letzte 30 Tage','90':'Letzte 90 Tage','custom':'Eigener Zeitraum'}[verlaufRange];
-  $('#vhSub').textContent=rangeLabel+' · '+list.length+' '+(list.length===1?'Messung':'Messungen');
+  applyVerlaufRange(); syncMetricSeg();
+  const bp=viewMetric==='bp';
+  const list=(bp?getFiltered():getFilteredVitals(viewMetric)).slice().sort(byTsDesc);
+  $('#vhSub').textContent=RANGE_LABEL[verlaufRange]+' · '+list.length+' '+(list.length===1?'Messung':'Messungen');
   $$('#vFilter .vh-pill').forEach(p=>p.classList.toggle('active',p.dataset.r===verlaufRange));
+  $('#vColh').innerHTML=bp
+    ? '<span class="vh-c-date">DATUM</span><span class="vh-c-n">SYS</span><span class="vh-c-n">DIA</span><span class="vh-c-p">PULS</span><span class="vh-c-chev"></span>'
+    : '<span class="vh-c-date">DATUM</span><span class="vh-c-m">'+METRICS[viewMetric].name.toUpperCase()+'</span><span class="vh-c-chev"></span>';
   const vl=$('#vList'), ve=$('#vEmpty');
   if(!list.length){
     vl.innerHTML='';
-    ve.innerHTML=!entries.length
-      ? 'Noch keine Messung erfasst.<br>Tippe unten auf das <b style="color:var(--accent)">+</b>.'
-      : 'Keine Messungen in diesem Zeitraum.';
+    const none=bp?!entries.length:!vitalsOf(viewMetric).length;
+    ve.innerHTML=none
+      ? (bp?'Noch keine Messung erfasst.':'Noch kein Wert erfasst.')+'<br>Tippe unten auf das <b style="color:var(--accent)">+</b>.'
+      : (bp?'Keine Messungen in diesem Zeitraum.':'Keine Werte in diesem Zeitraum.');
     ve.hidden=false;
   }else{
     ve.hidden=true;
     let html='';
     list.forEach((e,i)=>{
-      const d=new Date(e.ts);
-      const dateLabel=WD_SHORT[d.getDay()]+', '+pad2(d.getDate())+'.'+pad2(d.getMonth()+1)+'.';
-      const time=pad2(d.getHours())+':'+pad2(d.getMinutes());
-      const sc=catValFor('sys',e.sys), dc=catValFor('dia',e.dia), oc=worseCat(sc,dc);
-      const delay=Math.min(i*0.04,0.32);
-      html+='<button class="vrow" type="button" data-id="'+e.id+'" style="animation-delay:'+delay+'s">'
-        +'<span class="vrow-dot" style="background:'+CAT_BAR[oc]+'"></span>'
-        +'<span class="vrow-main"><span class="vrow-date">'+dateLabel+'</span>'
-        +'<span class="vrow-sub">'+time+(e.note?IC_NOTE_SM:'')+'</span></span>'
-        +'<span class="vrow-v tnum" style="color:'+CAT_INK[sc]+'">'+e.sys+'</span>'
-        +'<span class="vrow-v tnum" style="color:'+CAT_INK[dc]+'">'+e.dia+'</span>'
-        +'<span class="vrow-p tnum">'+e.pulse+'</span>'
-        +'<span class="vrow-chev">'+IC_CHEV+'</span>'
-        +'</button>';
+      const d=new Date(e.ts), time=pad2(d.getHours())+':'+pad2(d.getMinutes()), delay=Math.min(i*0.04,0.32);
+      html+='<button class="vrow" type="button" data-id="'+e.id+'" style="animation-delay:'+delay+'s">';
+      if(bp){
+        const sc=catValFor('sys',e.sys), dc=catValFor('dia',e.dia), oc=worseCat(sc,dc);
+        html+='<span class="vrow-dot" style="background:'+CAT_BAR[oc]+'"></span>'
+          +'<span class="vrow-main"><span class="vrow-date">'+vDate(d)+'</span><span class="vrow-sub">'+time+(e.note?IC_NOTE_SM:'')+'</span></span>'
+          +'<span class="vrow-v tnum" style="color:'+CAT_INK[sc]+'">'+e.sys+'</span>'
+          +'<span class="vrow-v tnum" style="color:'+CAT_INK[dc]+'">'+e.dia+'</span>'
+          +'<span class="vrow-p tnum">'+fmtPulse(e.pulse)+'</span>';
+      }else{
+        const k=catMetric(e.type,e.value);
+        html+='<span class="vrow-dot" style="background:'+CAT_BAR[k.c]+'"></span>'
+          +'<span class="vrow-main"><span class="vrow-date">'+vDate(d)+'</span><span class="vrow-sub">'+time+(e.note?IC_NOTE_SM:'')+'</span></span>'
+          +'<span class="vrow-m tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetricUnit(e.type,e.value)+'</span>';
+      }
+      html+='<span class="vrow-chev">'+IC_CHEV+'</span></button>';
     });
     vl.innerHTML=html;
   }
   if(currentTab==='table') requestAnimationFrame(positionVInk);
 }
+/* Umschalter Blutdruck · Temperatur · Sauerstoff (je einer in Verlauf und Diagramm, gleicher Zustand). */
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('.metric-seg button[data-metric]'); if(!b||b.dataset.metric===viewMetric) return;
+  viewMetric=b.dataset.metric;
+  if(currentTab==='chart'){ closeDgPop(); renderChart(); } else renderTable();
+});
 /* Gleitende Markierung unter die aktive Zeitraum-Pille legen (misst deren Position). */
 function positionVInk(){
   const bar=$('#vFilter'); if(!bar) return;
@@ -549,6 +689,7 @@ $('#rsApply').addEventListener('click',()=>{
   navBack();                                               // … dann das Sheet schließen (eine Ebene zurück)
 });
 document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&!$('#rangeSheet').hidden){ ev.preventDefault(); closeRangeSheet(); } });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&!$('#plusSheet').hidden){ ev.preventDefault(); closeSheet('#plusSheet'); } });
 
 /* Die früheren Zeitraum-Chips des Diagramms sind entfallen: Verlauf und Diagramm teilen sich jetzt
    denselben Zeitraum (verlaufRange + filters.from/to, gesetzt über applyVerlaufRange bzw. das Von–Bis-Sheet). */
@@ -580,9 +721,45 @@ function detContext(e){
 }
 
 function showDetail(id){ detailId=id; navPush('detail',null); }
+/* Datensatz nach id suchen – Blutdruck (entries) oder Temperatur/Sauerstoff (vitals); ids sind eindeutig. */
+function findRecord(id){
+  const e=entries.find(x=>x.id===id); if(e) return {kind:'bp',rec:e};
+  const v=vitals.find(x=>x.id===id); return v?{kind:'vital',rec:v}:null;
+}
+const IC_INFO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+/* Detail für Temperatur/Sauerstoff: großer Wert in Ampelfarbe, Datum, Position auf der Ampel-Skala
+   (metricScale: Temperatur Gelb auf beiden Seiten, Sauerstoff umgedreht), Notiz; beim Sauerstoff ein
+   sachlicher Mess-Hinweis. Keine Bewertung, kein Kontext-Satz. */
+function renderVitalDetail(v){
+  const M=METRICS[v.type], k=catMetric(v.type,v.value), d=new Date(v.ts), tod=todOf(d.getHours());
+  const fullDate=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const time=pad2(d.getHours())+':'+pad2(d.getMinutes());
+  const sc=metricScale(v.type), pct=x=>clamp((x-sc.lo)/(sc.hi-sc.lo)*100,0,100);
+  const grad='linear-gradient(90deg,'+sc.segs.map(g=>CAT_SOFT[g[0]]+' '+pct(g[1]).toFixed(1)+'% '+pct(g[2]).toFixed(1)+'%').join(',')+')';
+  let html='<div class="det-hero">'
+    +'<span class="det-pill" style="background:'+CAT_SOFT[k.c]+';color:'+CAT_INK[k.c]+'"><span class="d" style="background:'+CAT_BAR[k.c]+'"></span>'+k.t+'</span>'
+    +'<div class="det-nums"><div class="det-col"><span class="det-num tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetric(v.type,v.value)+'</span>'
+    +'<span class="det-num-l" style="color:'+CAT_INK[k.c]+'">'+M.name.toUpperCase()+'</span></div>'
+    +'<span class="det-unit" style="color:'+CAT_INK[k.c]+'">'+M.unit+'</span></div>'
+  +'</div>';
+  html+='<div class="det-card det-date"><div class="det-date-ic">'+IC_CAL+'</div>'
+    +'<div class="det-date-main"><div class="det-date-1">'+fullDate+'</div>'
+    +'<div class="det-date-2">'+time+'<span class="sep"></span>'+(tod==='abends'?IC_MOON:IC_SUN)+tod+'</div></div></div>';
+  html+='<div class="det-card det-scale"><div class="det-scale-h">POSITION IM AMPELBEREICH</div>'
+    +'<div class="det-scale-row"><div class="det-scale-top"><span class="det-scale-lab">'+M.name+'</span>'
+    +'<span class="det-scale-val tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetricUnit(v.type,v.value)+' · '+k.t+'</span></div>'
+    +'<div class="det-scale-bar" style="background:'+grad+'"><span class="det-scale-mk" style="left:'+clamp(pct(v.value),4,96)+'%;background:'+CAT_BAR[k.c]+';animation-delay:.06s"></span></div>'
+    +'<div class="det-ticks">'+sc.ticks.map(t=>'<span>'+t[1]+'</span>').join('')+'</div></div>'
+  +'</div>';
+  if(v.note) html+='<div class="det-card det-note">'+IC_NOTE+'<div class="det-note-txt">„'+escapeHtml(v.note)+'"</div></div>';
+  if(v.type==='spo2') html+='<div class="det-ctx det-info">'+IC_INFO+'<span>Kalte Finger, Nagellack oder Bewegung können den Wert verfälschen.</span></div>';
+  $('#detBody').innerHTML=html;
+}
 function renderDetail(id){
-  const e=entries.find(x=>x.id===id);
-  if(!e){ showTab('table'); return; }
+  const f=findRecord(id);
+  if(!f){ showTab('table'); return; }
+  if(f.kind==='vital'){ renderVitalDetail(f.rec); return; }
+  const e=f.rec;
   const sc=catValFor('sys',e.sys), dc=catValFor('dia',e.dia), oc=worseCat(sc,dc);
   const d=new Date(e.ts), tod=todOf(d.getHours());
   const fullDate=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -604,7 +781,7 @@ function renderDetail(id){
       +'<span class="det-slash">/</span>'
       +'<div class="det-col"><span class="det-num tnum" style="color:'+CAT_INK[dc]+'">'+e.dia+'</span><span class="det-num-l" style="color:'+CAT_INK[dc]+'">DIA</span></div>'
     +'</div>'
-    +'<div class="det-meta">mmHg<span class="sep"></span><span class="hb">'+IC_HEART+'<b class="tnum">'+e.pulse+'</b> Puls</span></div>'
+    +'<div class="det-meta">mmHg<span class="sep"></span><span class="hb">'+IC_HEART+'<b class="tnum">'+fmtPulse(e.pulse)+'</b> Puls</span></div>'
   +'</div>';
   html+='<div class="det-card det-date"><div class="det-date-ic">'+IC_CAL+'</div>'
     +'<div class="det-date-main"><div class="det-date-1">'+fullDate+'</div>'
@@ -619,13 +796,16 @@ function renderDetail(id){
 }
 /* Detail-Aktionen: Zurück / Bearbeiten / Löschen. */
 $('#detBack').addEventListener('click',()=>navBack());
-$('#detEdit').addEventListener('click',()=>{ const e=entries.find(x=>x.id===detailId); if(e) startCapture(e,'detail'); });
+$('#detEdit').addEventListener('click',()=>{ const f=findRecord(detailId); if(!f) return;
+  startCapture(f.kind==='bp'?{entry:f.rec}:{vital:f.rec},'detail'); });
 $('#detDelete').addEventListener('click',()=>{
-  const e=entries.find(x=>x.id===detailId); if(!e) return;
-  const prev='<div class="pd">'+fmtDate(e.ts)+' · '+fmtTime(e.ts)+'</div>'
-    +'<div class="pv"><span style="color:'+CAT_INK[catValFor('sys',e.sys)]+'">'+e.sys+'</span> / <span style="color:'+CAT_INK[catValFor('dia',e.dia)]+'">'+e.dia+'</span> · Puls '+e.pulse+'</div>';
+  const f=findRecord(detailId); if(!f) return;
+  const e=f.rec;
+  let prev='<div class="pd">'+fmtDate(e.ts)+' · '+fmtTime(e.ts)+'</div>';
+  if(f.kind==='bp') prev+='<div class="pv"><span style="color:'+CAT_INK[catValFor('sys',e.sys)]+'">'+e.sys+'</span> / <span style="color:'+CAT_INK[catValFor('dia',e.dia)]+'">'+e.dia+'</span> · Puls '+fmtPulse(e.pulse)+'</div>';
+  else prev+='<div class="pv">'+METRICS[e.type].name+' <span style="color:'+CAT_INK[catMetric(e.type,e.value).c]+'">'+fmtMetricUnit(e.type,e.value)+'</span></div>';
   askConfirm({icon:'trash',tone:'danger',danger:true,title:'Eintrag löschen?',message:'Dieser Eintrag wird dauerhaft entfernt.',previewHTML:prev,confirmLabel:'Löschen'})
-    .then(ok=>{ if(ok){ removeEntry(detailId); navBack(); toast('Eintrag gelöscht'); } });
+    .then(ok=>{ if(ok){ if(f.kind==='bp') removeEntry(detailId); else removeVital(detailId); navBack(); toast('Eintrag gelöscht'); } });
 });
 
 /* ---------- Diagramm (Variante A, SVG) ----------
@@ -727,12 +907,14 @@ function diagDateLabels(list,n,X,y,muted){
 function diagPulseLayer(list,anim){
   const xL=14,xR=232,n=list.length;
   const X=i=>n<=1?(xL+xR)/2:+(xL+i*(xR-xL)/(n-1)).toFixed(1);
-  const pv=list.map(m=>m.pulse), pmin=Math.min(...pv)-6, pmax=Math.max(...pv)+6, laneTop=146,laneBot=160;
+  const pts=list.map((m,i)=>[i,m.pulse]).filter(p=>Number.isFinite(p[1]));   // Messungen ohne Puls auslassen
+  if(!pts.length) return '<g class="dg-pulse-g"></g>';
+  const pv=pts.map(p=>p[1]), pmin=Math.min(...pv)-6, pmax=Math.max(...pv)+6, laneTop=146,laneBot=160;
   const PY=v=>+(laneBot-(v-pmin)/((pmax-pmin)||1)*(laneBot-laneTop)).toFixed(1);
   const pBar=cssVar('--pulse-bar'), pInk=cssVar('--pulse-ink'), surf=cssVar('--surf');
   let s='<g class="dg-pulse-g">';
-  s+='<polyline'+(anim?' class="dg-line"':'')+' points="'+list.map((m,i)=>X(i)+','+PY(m.pulse)).join(' ')+'" fill="none" stroke="'+pBar+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>';
-  list.forEach((m,i)=>{ s+='<circle'+(anim?' class="dg-pt"':'')+' cx="'+X(i)+'" cy="'+PY(m.pulse)+'" r="2.5" fill="'+pBar+'" stroke="'+surf+'" stroke-width="1.1"'+(anim?' style="animation-delay:'+(0.4+i*0.03).toFixed(2)+'s"':'')+'/>'; });
+  s+='<polyline'+(anim?' class="dg-line"':'')+' points="'+pts.map(p=>X(p[0])+','+PY(p[1])).join(' ')+'" fill="none" stroke="'+pBar+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>';
+  pts.forEach(p=>{ const i=p[0]; s+='<circle'+(anim?' class="dg-pt"':'')+' cx="'+X(i)+'" cy="'+PY(p[1])+'" r="2.5" fill="'+pBar+'" stroke="'+surf+'" stroke-width="1.1"'+(anim?' style="animation-delay:'+(0.4+i*0.03).toFixed(2)+'s"':'')+'/>'; });
   s+='<text x="236" y="'+(PY(pmax)+8)+'" font-size="7.5" font-weight="800" fill="'+pInk+'">bpm</text>';
   s+='</g>';
   return s;
@@ -762,8 +944,38 @@ function setDiagPulseLayer(show){
   } else applySize();
 }
 
+/* Diagramm für Temperatur/Sauerstoff: Kopf mit Ø + Ampel-Wort, eigene Grafik (buildMetricChart, zeitgetreu),
+   Legende mit Anzahl je Ampel-Wort, darunter Höchster · Niedrigster · Messungen (Farbe = Ampel des Werts). */
+function renderMetricChart(type){
+  const M=METRICS[type], list=getFilteredVitals(type).sort(byTsAsc), short=DG_SHORT[verlaufRange]||'30 Tage';
+  lastChartList=null;
+  $('#dgSub').textContent=M.name+' · '+short+' · '+list.length+(list.length===1?' Messung':' Messungen');
+  $('#dgRangeLbl').textContent='Zeitraum: '+(verlaufRange==='custom'?'eigener':short);
+  $$('#dgPop button').forEach(b=>b.classList.toggle('active',b.dataset.r===verlaufRange));
+  const body=$('#dgBody');
+  if(!list.length){ body.innerHTML='<div class="dg-card"><div class="dg-empty">'+(vitalsOf(type).length?'Noch keine Daten im gewählten Zeitraum.':'Noch kein Wert erfasst.')+'</div></div>'; return; }
+  const avg=meanMetric(list), k=catMetric(type,avg);
+  const valHtml='<div class="dg-val"><span class="dg-val-num tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetric(type,avg)+'</span>'
+    +'<span class="dg-val-side"><span class="dg-val-unit">'+M.unit+'</span><span class="dg-val-sub">Ø · '+short+'</span></span></div>';
+  const statusHtml='<span class="dg-status" style="background:'+CAT_SOFT[k.c]+';color:'+CAT_INK[k.c]+'"><span class="d" style="background:'+CAT_BAR[k.c]+'"></span>'+k.t+'</span>';
+  const cnt={}; list.forEach(m=>{ const t=catMetric(type,m.value).t; cnt[t]=(cnt[t]||0)+1; });
+  const order=type==='temp'?[['g','Normal'],['y','Niedrig'],['y','Erhöht'],['r','Fieber']]:[['g','Im Ziel'],['y','Niedrig'],['r','Zu niedrig']];
+  const cnts=order.filter(o=>!(type==='temp'&&o[1]==='Niedrig'&&!cnt[o[1]]))
+    .map(o=>'<span style="color:'+CAT_INK[o[0]]+'">'+(cnt[o[1]]||0)+' '+o[1]+'</span>').join('');
+  const legHtml='<div class="dg-legend single"><span class="avg" style="color:var(--accent)"><i style="border-color:var(--accent)"></i>Ø '+fmtMetric(type,avg)+'</span><span class="cnts">'+cnts+'</span></div>';
+  const vals=list.map(m=>m.value), mx=Math.max(...vals), mn=Math.min(...vals);
+  const sc=(l,v,col)=>'<div class="dg-stat"><div class="dg-stat-l">'+l+'</div><div class="dg-stat-v tnum" style="color:'+col+'">'+v+'</div></div>';
+  const statHtml='<div class="dg-stat3">'+sc('HÖCHSTER',fmtMetric(type,mx),CAT_INK[catMetric(type,mx).c])
+    +sc('NIEDRIGSTER',fmtMetric(type,mn),CAT_INK[catMetric(type,mn).c])+sc('MESSUNGEN',list.length,'var(--ink)')+'</div>';
+  body.innerHTML='<div class="dg-card"><div class="dg-cardhead">'+valHtml+statusHtml+'</div>'
+    +'<div class="dg-chart">'+buildMetricChart(type,list,avg)+'</div>'+legHtml+'</div>'+statHtml;
+}
+
 function renderChart(){
   applyVerlaufRange();                                 // gemeinsamer Zeitraum mit dem Verlauf
+  syncMetricSeg();
+  const ctr=$('#tab-chart .dg-controls'); if(ctr) ctr.classList.toggle('only-range',viewMetric!=='bp');
+  if(viewMetric!=='bp'){ renderMetricChart(viewMetric); return; }   // Temperatur/Sauerstoff: eigene Grafik, buildDiagChart bleibt unberührt
   const list=getFiltered().slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   lastChartList=list;                                  // fürs Teil-Update der Puls-Ebene (setDiagPulseLayer)
   const both=diagSeries==='both', short=DG_SHORT[verlaufRange]||'30 Tage';
@@ -776,7 +988,7 @@ function renderChart(){
   if(!list.length){ body.innerHTML='<div class="dg-card"><div class="dg-empty">Noch keine Daten im gewählten Zeitraum.</div></div>'; return; }
 
   const sst=seriesStats(list,'sys'), dst=seriesStats(list,'dia'), st=diagSeries==='dia'?dst:sst;
-  const pulseAvg=Math.round(list.reduce((a,m)=>a+m.pulse,0)/list.length);
+  const pulseAvg=meanKey(list,'pulse');
   let og=0,oy=0,orr=0;                                 // Gesamt-Ampel je Messung (schlechterer von Sys/Dia)
   list.forEach(m=>{ const ov=worseCat(catValFor('sys',m.sys),catValFor('dia',m.dia)); if(ov==='r')orr++; else if(ov==='y')oy++; else og++; });
   const overallCat=worseCat(sst.cat,dst.cat);
@@ -816,12 +1028,12 @@ function renderChart(){
   /* Statistik: „Beide" als Tabelle, Einzelmodus als drei Kacheln. */
   let statHtml;
   if(both){
-    const pv=list.map(m=>m.pulse), pMax=Math.max(...pv), pMin=Math.min(...pv);
+    const pv=list.map(m=>m.pulse).filter(Number.isFinite), pMax=pv.length?Math.max(...pv):'–', pMin=pv.length?Math.min(...pv):'–';
     const head=(name,unit,pink)=>'<div class="dg-sg-h"><b style="color:'+(pink?'var(--pulse-ink)':'var(--ink)')+'">'+name+'</b><span>'+unit+'</span></div>';
     const vc=(v,col)=>'<div class="dg-sg-v tnum" style="color:'+col+'">'+v+'</div>';
     const rl=x=>'<div class="dg-sg-rl">'+x+'</div>';
     statHtml='<div class="dg-statgrid"><div></div>'+head('Sys','mmHg')+head('Dia','mmHg')+head('Puls','bpm',true)
-      +rl('Ø')+vc(sst.avg,CAT_INK[sst.cat])+vc(dst.avg,CAT_INK[dst.cat])+vc(pulseAvg,'var(--pulse-ink)')
+      +rl('Ø')+vc(sst.avg,CAT_INK[sst.cat])+vc(dst.avg,CAT_INK[dst.cat])+vc(fmtPulse(pulseAvg),'var(--pulse-ink)')
       +rl('MAX')+vc(sst.max,'var(--ink)')+vc(dst.max,'var(--ink)')+vc(pMax,'var(--ink)')
       +rl('MIN')+vc(sst.min,'var(--ink)')+vc(dst.min,'var(--ink)')+vc(pMin,'var(--ink)')+'</div>';
   } else {
@@ -853,11 +1065,11 @@ $('#dgPop').addEventListener('click',ev=>{ const b=ev.target.closest('button'); 
 document.addEventListener('click',ev=>{ if($('#dgPop').hidden) return;
   if(!ev.target.closest('#dgPop')&&!ev.target.closest('#dgCal')) closeDgPop(); });
 
-/* ---------- Dashboard (Startseite) ----------
-   Kennzahlen nach dashboard-spezifikation.md: rollierende Fenster (7/30 Tage), Trend gegen die
-   Vorwoche, Ampel-Verteilung über 30 Tage. Rechnet aus den echten Einträgen (ts/sys/dia/pulse). */
+/* ---------- Dashboard (Startseite) ---------- */
 const ageDays=ts=>(Date.now()-new Date(ts).getTime())/86400000;          // Alter eines Eintrags in Tagen
-function meanKey(list,key){ return list.length?Math.round(list.reduce((s,e)=>s+e[key],0)/list.length):null; }
+function meanKey(list,key){ const v=list.map(e=>e[key]).filter(Number.isFinite);   // Puls kann fehlen (null)
+  return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length):null; }
+const fmtPulse=p=>Number.isFinite(p)?String(p):'–';
 function relTime(ts){
   const diff=Date.now()-new Date(ts).getTime();
   const min=Math.round(diff/60000);
@@ -877,127 +1089,114 @@ function roundTo100(raw){
   for(let k=0;k<rem&&k<order.length;k++) fl[order[k][1]]++;
   return fl;
 }
-/* Trend-Chip: neutraler Pfeil (rauf/runter/gleich) + Betrag. Bewusst KEINE Wertung gut/schlecht –
-   die Farbe trägt die Gesamt-Ampel (siehe Datenspezifikation). '—' wenn kein Vergleich möglich. */
-function trendChip(diff){
-  if(diff==null) return '<span class="dtrend">—</span>';
-  const a=Math.abs(diff);
-  const d=diff<0?'M12 5v13M18 12l-6 6-6-6':diff>0?'M12 19V6M6 12l6-6 6 6':'M5 12h14';
-  return '<span class="dtrend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="'+d+'"/></svg>'+a+'</span>';
-}
-function legRow(color,name,count,pct){
-  return '<div class="dleg-row"><span class="dleg-sq" style="background:'+color+'"></span>'
-    +'<span class="dleg-name">'+name+'</span>'
-    +'<span class="dleg-val"><b>'+count+'</b> · '+pct+'%</span></div>';
-}
-const IC_GAUGE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 18a8 8 0 1 1 15 0"/><path d="M12 18l3.6-4.6"/><circle cx="12" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>';
-const IC_ACT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4.5l2-6 3.5 12 2.5-8 1.6 2H22"/></svg>';
 const IC_HEART='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.3l-1.4-1.3C5.4 14.2 2 11.1 2 7.6 2 5 4 3 6.5 3c1.7 0 3.3 1 4.1 2.4h.8C12.2 4 13.8 3 15.5 3 18 3 20 5 20 7.6c0 3.5-3.4 6.6-8.6 11.4L12 20.3z"/></svg>';
-const IC_DIST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="2" width="8" height="20" rx="4"/><circle cx="12" cy="7.5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="16.5" r="1.6" fill="currentColor" stroke="none"/></svg>';
+
+/* Dashboard „Letzte Messung + 7 Tage" (dashboard-spezifikation.md, Stand 2026-11-07):
+   oben die letzte Messung je Wert als eigene Karte, darunter der Ø der letzten 7 Tage (168 h, fest)
+   in Ampelfarbe + Ampel-Wort, erst ab 3 Messungen. Kein Trend, kein Ring, keine Grafik. */
+const DASH_MIN=3;
+const IC_HEART_LINE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 5.6a5.4 5.4 0 0 0-7.7 0L12 6.7l-1.1-1.1a5.4 5.4 0 1 0-7.7 7.7L12 22l8.8-8.7a5.4 5.4 0 0 0 0-7.7z"/></svg>';
+const dHead=(icon,t1,t2,pulse)=>'<span class="dhead-l"><span class="dicon'+(pulse?' pulse':'')+'">'+icon+'</span>'
+  +'<span class="dhead-tx"><span class="dhead-t1">'+t1+'</span><span class="dhead-t2">'+t2+'</span></span></span>';
+const dWord=(cat,word)=>'<span class="dword" style="color:'+CAT_INK[cat]+'"><span class="ddot" style="background:'+CAT_BAR[cat]+'"></span>'+word+'</span>';
+/* Zahl mit Hochzähl-Markierung (nur ganze Zahlen; die Temperatur bleibt ohne Animation). */
+const dCount=n=>'<span data-count="'+n+'">'+n+'</span>';
 
 function renderDashboard(){
   const host=$('#dashboard'); if(!host) return;
   const de=$('#dashDate'); if(de) de.textContent=fmtLongDate(new Date());
-  if(!entries.length){
+  if(!totalCount()){
     host.innerHTML='<div class="dcard" style="padding:22px 18px;text-align:center">'
       +'<div style="font-size:15px;font-weight:800;margin-bottom:6px">Noch keine Messung erfasst.</div>'
       +'<div style="font-size:13px;color:var(--muted);line-height:1.5">Tippe unten auf das <b style="color:var(--accent)">+</b>, um deine erste Messung einzutragen.</div>'
       +'</div>';
     return;
   }
-  const sorted=entries.slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  const last=sorted[0];
-  const lc=category(last), sc=catValFor('sys',last.sys), dc=catValFor('dia',last.dia);
+  let html='<h2 class="dsec">Letzte Messung</h2>';
 
-  const cur=entries.filter(e=>ageDays(e.ts)<=7);                          // letzte 7 Tage
-  const prev=entries.filter(e=>{const a=ageDays(e.ts);return a>7&&a<=14;}); // die 7 Tage davor
-  const trend=(k)=>{ const a=meanKey(cur,k),b=meanKey(prev,k); return (a==null||b==null)?null:a-b; };
-  const sys7=meanKey(cur,'sys'), dia7=meanKey(cur,'dia'), pul7=meanKey(cur,'pulse');
-  const na='<span class="dtile-num" style="color:var(--muted)">–</span>';
-
-  const cur30=entries.filter(e=>ageDays(e.ts)<=30);                       // letzte 30 Tage
-  let g=0,y=0,r=0; cur30.forEach(e=>{const c=category(e); if(c==='r')r++;else if(c==='y')y++;else g++;});
-  const total=cur30.length;
-
-  let html='';
-  // Hero: Letzte Messung – Sys/Dia je in ihrer eigenen Ampelfarbe, dazu die Gesamt-Ampel als Pille
-  html+='<div class="dcard dcard-pad">'
-    +'<div class="dhero-top">'
-      +'<div class="dhead-l"><span class="dicon">'+IC_GAUGE+'</span>'
-        +'<div><div class="dhead-t1">Letzte Messung</div><div class="dhead-t2">'+relTime(last.ts)+'</div></div></div>'
-      +'<span class="dpill" style="background:'+CAT_SOFT[lc]+';color:'+CAT_INK[lc]+'"><span class="ddot" style="background:'+CAT_BAR[lc]+'"></span>'+CAT_LABEL[lc]+'</span>'
-    +'</div>'
-    +'<div class="dhero-nums">'
-      +'<div style="display:flex;align-items:flex-end;gap:3px">'
-        +'<div class="dbig"><span class="n" data-count="'+last.sys+'" style="color:'+CAT_INK[sc]+'">'+last.sys+'</span><span class="l" style="color:'+CAT_INK[sc]+'">SYS</span></div>'
-        +'<span class="dslash">/</span>'
-        +'<div class="dbig"><span class="n" data-count="'+last.dia+'" style="color:'+CAT_INK[dc]+'">'+last.dia+'</span><span class="l" style="color:'+CAT_INK[dc]+'">DIA</span></div>'
-      +'</div>'
-      +'<div class="dhero-side"><div class="u">mmHg</div><div class="p">Puls '+last.pulse+'</div></div>'
-    +'</div>'
-  +'</div>';
-
-  // Kacheln: Ø Blutdruck (7 Tage) mit Trend + Ø Puls (7 Tage) mit Trend
-  html+='<div class="dtiles">'
-    +'<div class="dtile wide">'
-      +'<div class="dhead-l"><span class="dicon">'+IC_ACT+'</span><div><div class="dhead-t1">Blutdruck</div><div class="dhead-t2">Ø 7 Tage · mmHg</div></div></div>'
-      +'<div class="dtile-avgs">'
-        +'<div class="dtile-col"><div class="dtile-cell">'+(sys7!=null?'<span class="dtile-num">'+sys7+'</span>':na)+'<span class="dtile-lbl">SYS</span></div>'+trendChip(trend('sys'))+'</div>'
-        +'<div class="dtile-div"></div>'
-        +'<div class="dtile-col"><div class="dtile-cell">'+(dia7!=null?'<span class="dtile-num">'+dia7+'</span>':na)+'<span class="dtile-lbl">DIA</span></div>'+trendChip(trend('dia'))+'</div>'
-      +'</div>'
-      +'<div class="dtile-foot">vs. Vorwoche</div>'
-    +'</div>'
-    +'<div class="dtile" style="text-align:center">'
-      +'<div class="dhead-l" style="justify-content:center"><span class="dicon pulse">'+IC_HEART+'</span><div class="dhead-t1">Puls</div></div>'
-      +'<div class="dtile-pulse"><div class="dtile-cell">'+(pul7!=null?'<span class="dtile-num">'+pul7+'</span>':na)+'<span class="dtile-lbl">BPM</span></div>'+trendChip(trend('pulse'))+'</div>'
-      +'<div class="dtile-foot">vs. Vorwoche</div>'
-    +'</div>'
-  +'</div>';
-
-  // Ampel-Verteilung (30 Tage) als Ring + Legende
-  html+='<div class="dcard dcard-pad">'
-    +'<div class="dhero-top" style="margin-bottom:12px">'
-      +'<div class="dhead-l"><span class="dicon">'+IC_DIST+'</span><div><div class="dhead-t1">Ampel-Verteilung</div><div class="dhead-t2">Letzte 30 Tage</div></div></div>'
-      +'<span style="font-size:10.5px;font-weight:700;color:var(--muted)">'+total+' '+(total===1?'Messung':'Messungen')+'</span>'
-    +'</div>';
-  if(!total){
-    html+='<div style="font-size:13px;color:var(--muted);padding:2px 2px 4px">Noch keine Daten in den letzten 30 Tagen.</div>';
+  /* --- Letzte Messung: Blutdruck + Puls (eine Messung, eine Karte) --- */
+  const lastBp=entries.slice().sort(byTsDesc)[0];
+  if(lastBp){
+    const c=category(lastBp);
+    html+='<button type="button" class="dcard dlm dlm-bp" data-det="'+lastBp.id+'">'
+      +'<span class="dlm-main">'+dHead(icSvg(IC_PATH_BP),'Blutdruck',relTime(lastBp.ts))
+        +'<span class="dlm-val tnum" style="color:'+CAT_INK[c]+'"><span class="dlm-n">'+dCount(lastBp.sys)+'/'+dCount(lastBp.dia)+'</span><span class="dlm-u"> mmHg</span></span>'
+        +dWord(c,CAT_LABEL[c])+'</span>'
+      +'<span class="dlm-pul">'+dHead(IC_HEART_LINE,'Puls','bpm',true)
+        +'<span class="dlm-val tnum" style="color:var(--pulse-ink)"><span class="dlm-n">'+(Number.isFinite(lastBp.pulse)?dCount(lastBp.pulse):'–')+'</span></span></span>'
+      +'</button>';
   }else{
-    const p=roundTo100([g/total*100,y/total*100,r/total*100]), pg=p[0],py=p[1],pr=p[2];
-    const seg='conic-gradient(var(--g-bar) 0 '+pg+'%,var(--y-bar) '+pg+'% '+(pg+py)+'%,var(--r-bar) '+(pg+py)+'% 100%)';
-    html+='<div class="ddist-body">'
-      +'<div class="ring"><div class="ring-fill" style="background:'+seg+'"></div><div class="ring-c"><span class="ring-pct" data-count="'+pg+'" data-suf="%" style="color:var(--g-ink)">'+pg+'%</span><span class="ring-lbl">im Ziel</span></div></div>'
-      +'<div class="dleg">'+legRow('var(--g-bar)','Im Ziel',g,pg)+legRow('var(--y-bar)','Erhöht',y,py)+legRow('var(--r-bar)','Zu hoch',r,pr)+'</div>'
-    +'</div>';
+    html+='<div class="dcard dlm dlm-none">'+dHead(icSvg(IC_PATH_BP),'Blutdruck','Noch kein Wert')+'</div>';
   }
+  /* --- Letzte Messung: Temperatur | Sauerstoff --- */
+  html+='<div class="dlm-row">';
+  VITAL_TYPES.forEach(type=>{
+    const M=METRICS[type], last=vitalsOf(type).sort(byTsDesc)[0];
+    if(!last){ html+='<div class="dcard dlm dlm-none">'+dHead(icSvg(M.icon),M.name,'Noch kein Wert')+'</div>'; return; }
+    const k=catMetric(type,last.value);
+    html+='<button type="button" class="dcard dlm" data-det="'+last.id+'">'+dHead(icSvg(M.icon),M.name,relTime(last.ts))
+      +'<span class="dlm-val sm tnum" style="color:'+CAT_INK[k.c]+'"><span class="dlm-n">'+(type==='temp'?fmtMetric(type,last.value):dCount(last.value))+'</span><span class="dlm-u"> '+M.unit+'</span></span>'
+      +dWord(k.c,k.t)+'</button>';
+  });
   html+='</div>';
+
+  /* --- Letzte 7 Tage: Ø erst ab 3 Messungen, Ampelfarbe + Wort auf dem gerundeten Ø --- */
+  html+='<h2 class="dsec">Letzte 7 Tage</h2>';
+  const avgBlock=(n,valHtml,cat,word)=>{
+    if(!n) return '<span class="dst-empty"><b>Keine Messung</b><span>in den letzten 7 Tagen</span></span>';
+    if(n<DASH_MIN) return '<span class="dst-empty"><b>Zu wenige Messungen</b><span>Ø erst ab '+DASH_MIN+' Messungen</span></span>';
+    return '<span class="dst-avg" style="color:'+CAT_INK[cat]+'"><span class="dst-v tnum">'+valHtml+'</span>'+dWord(cat,word)+'</span>';
+  };
+  // Blutdruck mit Puls-Zeile
+  const bp7=entries.filter(e=>ageDays(e.ts)<=7);
+  const s7=meanKey(bp7,'sys'), d7=meanKey(bp7,'dia'), p7list=bp7.filter(e=>Number.isFinite(e.pulse)), p7=meanKey(p7list,'pulse');
+  const bc=bp7.length>=DASH_MIN?category({sys:s7,dia:d7}):'n';
+  html+='<button type="button" class="dcard dst" data-chart="bp">'
+    +'<span class="dst-top">'+dHead(icSvg(IC_PATH_BP),'Blutdruck','Ø 7 Tage · mmHg')
+      +avgBlock(bp7.length,'<span class="dst-o">Ø </span><span class="dst-n">'+s7+'/'+d7+'</span><span class="dst-u"> mmHg</span>',bc,CAT_LABEL[bc])+'</span>';
+  if(bp7.length){
+    html+='<span class="dst-top dst-pulse">'+dHead(IC_HEART_LINE,'Puls','Ø 7 Tage · bpm',true)
+      +(p7list.length>=DASH_MIN
+        ? '<span class="dst-avg" style="color:var(--pulse-ink)"><span class="dst-v tnum"><span class="dst-o">Ø </span><span class="dst-n">'+p7+'</span><span class="dst-u"> bpm</span></span></span>'
+        : '<span class="dst-empty"><b>Zu wenige Messungen</b></span>')
+      +'</span>';
+  }
+  html+='</button>';
+  // Temperatur, Sauerstoff
+  VITAL_TYPES.forEach(type=>{
+    const M=METRICS[type], l7=vitalsOf(type).filter(v=>ageDays(v.ts)<=7), avg=meanMetric(l7);
+    const k=l7.length>=DASH_MIN?catMetric(type,avg):{c:'n',t:''};
+    html+='<button type="button" class="dcard dst" data-chart="'+type+'"><span class="dst-top">'+dHead(icSvg(M.icon),M.name,'Ø 7 Tage · '+M.unit)
+      +avgBlock(l7.length,'<span class="dst-o">Ø </span><span class="dst-n">'+fmtMetric(type,avg)+'</span><span class="dst-u"> '+M.unit+'</span>',k.c,k.t)+'</span></button>';
+  });
+
   host.innerHTML=html;
   animateDashboard();
 }
+/* Antippen: Karte „Letzte Messung" → Detail; 7-Tage-Karte → Diagramm mit diesem Wert, Zeitraum 7 Tage. */
+$('#dashboard').addEventListener('click',ev=>{
+  const d=ev.target.closest('[data-det]'); if(d){ showDetail(d.dataset.det); return; }
+  const c=ev.target.closest('[data-chart]'); if(!c) return;
+  viewMetric=c.dataset.chart; verlaufRange='7';
+  if(viewMetric==='bp'){ diagSeries='both'; diagPulse=true; }
+  goMainTab('chart');
+});
 
-/* Dashboard-Einblendung: die großen Zahlen zählen hoch (Count-up) und der Ampel-Ring
-   wird kreisförmig aufgedeckt (Maske dreht von 0° auf 360°). Läuft bei jedem Öffnen des
-   Dashboards. Respektiert „Bewegung reduzieren" (prefers-reduced-motion) → sofort Endwert. */
+/* Dashboard-Einblendung: die großen ganzen Zahlen zählen hoch (Count-up). Läuft bei jedem Öffnen.
+   Respektiert „Bewegung reduzieren" (prefers-reduced-motion) → sofort Endwert. (Der frühere
+   Ampel-Ring mit Aufdeck-Animation ist mit dem neuen Dashboard entfallen.) */
 let dashRAF=0;
 function animateDashboard(){
   const host=$('#dashboard'); if(!host) return;
-  const nums=[...host.querySelectorAll('[data-count]')].map(el=>({el,to:+el.dataset.count,suf:el.dataset.suf||''}));
-  const fill=host.querySelector('.ring-fill');
+  const nums=[...host.querySelectorAll('[data-count]')].map(el=>({el,to:+el.dataset.count}));
   const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(reduce){
-    nums.forEach(n=>{ n.el.textContent=n.to+n.suf; });
-    if(fill) fill.style.setProperty('--sweep','360deg');
-    return;
-  }
-  nums.forEach(n=>{ n.el.textContent='0'+n.suf; });
-  if(fill) fill.style.setProperty('--sweep','0deg');
-  const dur=680,t0=performance.now(),ease=p=>1-Math.pow(1-p,3);
   cancelAnimationFrame(dashRAF);
+  if(reduce){ nums.forEach(n=>{ n.el.textContent=n.to; }); return; }
+  nums.forEach(n=>{ n.el.textContent='0'; });
+  const dur=680,t0=performance.now(),ease=p=>1-Math.pow(1-p,3);
   const tick=now=>{
     const p=Math.min(1,(now-t0)/dur),e=ease(p);
-    nums.forEach(n=>{ n.el.textContent=Math.round(n.to*e)+n.suf; });
-    if(fill) fill.style.setProperty('--sweep',(360*e).toFixed(1)+'deg');
+    nums.forEach(n=>{ n.el.textContent=Math.round(n.to*e); });
     if(p<1) dashRAF=requestAnimationFrame(tick);
   };
   dashRAF=requestAnimationFrame(tick);
@@ -1009,11 +1208,15 @@ function download(blob,name){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 const csvCell=v=>{ v=String(v); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+/* Eine Zeile je Datensatz, nach Zeit sortiert; Spalten anderer Werte bleiben leer (nichts wird anhand
+   gleicher Uhrzeiten zusammengelegt). Temperatur mit Dezimalkomma fürs deutsche Excel. */
 function exportCSV(){
-  if(!entries.length){ toast('Noch keine Werte zum Exportieren','notice'); return; }
-  const rows=[['Datum','Uhrzeit','Systolisch','Diastolisch','Puls','Notiz']];
-  entries.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts))
-    .forEach(e=>rows.push([fmtDate(e.ts),fmtTime(e.ts),e.sys,e.dia,e.pulse,(e.note||'').replace(/\r?\n/g,' ')]));
+  if(!totalCount()){ toast('Noch keine Werte zum Exportieren','notice'); return; }
+  const rows=[['Datum','Uhrzeit','Systolisch','Diastolisch','Puls','Temperatur (°C)','SpO2 (%)','Notiz']];
+  const all=entries.map(e=>({ts:e.ts,c:[e.sys,e.dia,Number.isFinite(e.pulse)?e.pulse:'','',''],note:e.note}))
+    .concat(vitals.map(v=>({ts:v.ts,c:['','','',v.type==='temp'?fmtMetric('temp',v.value):'',v.type==='spo2'?fmtMetric('spo2',v.value):''],note:v.note})));
+  all.sort((a,b)=>new Date(a.ts)-new Date(b.ts))
+    .forEach(r=>rows.push([fmtDate(r.ts),fmtTime(r.ts),...r.c,(r.note||'').replace(/\r?\n/g,' ')]));
   const csv='﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
   download(new Blob([csv],{type:'text/csv;charset=utf-8'}),`blutdruck-${todayStr()}.csv`);
   toast('CSV exportiert');
@@ -1022,13 +1225,13 @@ function exportCSV(){
 // einheitlich für alle Backup-Wege und nötig fürs Teilen auf Android (Chrome lehnt .json beim
 // share() ab). Wiederherstellen liest per JSON.parse, die Datei-Endung spielt dabei keine Rolle.
 function backupName(){ return `blutdruck-pro-backup-${stampDateTime()}.txt`; }
-const BACKUP_VER=2;
+const BACKUP_VER=3;   // Version 3: zusätzlich `vitals` (Temperatur & Sauerstoff); entries bleibt unverändert lesbar für die alte App
 /* Nur die „Vorlieben" sichern – geräte-interne Erinnerungs-Merker (firstDirtyAt/snoozeUntil) bleiben außen vor. */
-function backupSettings(){ const {colorDots,guideLines,theme,accent,reminderDays,thr}=settings; return {colorDots,guideLines,theme,accent,reminderDays,thr}; }
-function backupData(){ return {app:'blutdruck',version:BACKUP_VER,exportedAt:new Date().toISOString(),entries,settings:backupSettings()}; }
+function backupSettings(){ const {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode}=settings; return {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode}; }
+function backupData(){ return {app:'blutdruck',version:BACKUP_VER,exportedAt:new Date().toISOString(),entries,vitals,settings:backupSettings()}; }
 function backupBlob(){ return new Blob([JSON.stringify(backupData(),null,2)],{type:'text/plain'}); }
 function exportJSON(){
-  if(!entries.length){ toast('Noch keine Werte zum Sichern','notice'); return; }
+  if(!totalCount()){ toast('Noch keine Werte zum Sichern','notice'); return; }
   download(backupBlob(),backupName());
   markBackedUp();
   toast('Backup gespeichert');
@@ -1036,7 +1239,7 @@ function exportJSON(){
 
 /* Backup über das native Teilen-Menü weitergeben (Cloud/Mail/Messenger); Fallback: Download. */
 async function shareBackup(){
-  if(!entries.length){ toast('Noch keine Werte zum Sichern','notice'); return; }
+  if(!totalCount()){ toast('Noch keine Werte zum Sichern','notice'); return; }
   // backupName()/backupBlob() liefern bereits .txt / text/plain (siehe oben).
   const file=new File([backupBlob()],backupName(),{type:'text/plain'});
   if(!(navigator.canShare && navigator.canShare({files:[file]}))){  // Teilen nicht möglich → Download
@@ -1141,16 +1344,24 @@ function scheduleAutoBackup(){ clearTimeout(_abT); _abT=setTimeout(autoBackupIfL
    übergebenen Daten mit den vorhandenen Einträgen (nach id). Gibt {added,updated} zurück oder null,
    wenn nichts Gültiges drinsteckt. */
 function mergeEntriesFromData(data){
-  const arr=Array.isArray(data)?data:(data&&Array.isArray(data.entries)?data.entries:null);   // altes Array ODER neues Objekt {entries,settings}
-  if(!arr) return null;
-  const valid=arr.filter(x=>x&&typeof x==='object'&&Number.isFinite(+x.sys)&&Number.isFinite(+x.dia)&&Number.isFinite(+x.pulse)&&x.ts)
-    .map(x=>({id:x.id||uid(),ts:new Date(x.ts).toISOString(),sys:+x.sys,dia:+x.dia,pulse:+x.pulse,note:x.note?String(x.note):''}));
-  if(!valid.length) return null;
-  const map=new Map(entries.map(e=>[e.id,e]));
+  const obj=(!Array.isArray(data)&&data&&typeof data==='object')?data:null;
+  const arr=Array.isArray(data)?data:(obj&&Array.isArray(obj.entries)?obj.entries:[]);   // altes Array ODER Objekt {entries,vitals,settings}
+  const varr=obj&&Array.isArray(obj.vitals)?obj.vitals:[];
+  const okTs=x=>x.ts&&!isNaN(new Date(x.ts).getTime());
+  const valid=arr.filter(x=>x&&typeof x==='object'&&Number.isFinite(+x.sys)&&Number.isFinite(+x.dia)&&okTs(x))
+    .map(x=>({id:x.id||uid(),ts:new Date(x.ts).toISOString(),sys:+x.sys,dia:+x.dia,
+      pulse:(x.pulse==null||x.pulse==='')?null:(Number.isFinite(+x.pulse)?+x.pulse:null),   // Puls darf fehlen (übersprungen)
+      note:x.note?String(x.note):''}));
+  const vvalid=varr.map(normVital).filter(Boolean);
+  if(!valid.length&&!vvalid.length) return null;   // ungültig erst, wenn BEIDE Listen nichts Gültiges enthalten
   let added=0, updated=0;
+  const map=new Map(entries.map(e=>[e.id,e]));
   valid.forEach(e=>{ if(map.has(e.id)) updated++; else added++; map.set(e.id,e); });
-  entries=[...map.values()]; saveEntries(); markDirty(); refreshData();
-  return {added,updated,settings:(!Array.isArray(data)&&data&&data.settings)||null};
+  const vmap=new Map(vitals.map(v=>[v.id,v]));
+  vvalid.forEach(v=>{ if(vmap.has(v.id)) updated++; else added++; vmap.set(v.id,v); });
+  entries=[...map.values()]; vitals=[...vmap.values()];
+  saveEntries(); saveVitals(); markDirty(); refreshData();
+  return {added,updated,settings:(obj&&obj.settings)||null};
 }
 /* Im Backup enthaltene Einstellungen auf Wunsch übernehmen (geteilt von „Wiederherstellen" und „Auswählen"/„Ändern"). */
 let _pendingRestoreSettings=null;
@@ -1160,8 +1371,11 @@ function offerSettingsRestore(s){
   $('#restoreDlg').showModal();          // eigenes Fenster statt Browser-confirm (sprechende Knopf-Texte)
 }
 function applyBackupSettings(s){
-  ['colorDots','guideLines','theme','accent','reminderDays','thr'].forEach(k=>{ if(s[k]!==undefined) settings[k]=s[k]; });
-  settings.thr=Object.assign({},SET_DEFAULT.thr,settings.thr||{});
+  const curThr=settings.thr;
+  ['colorDots','guideLines','theme','accent','reminderDays','thr','plusMode'].forEach(k=>{ if(s[k]!==undefined) settings[k]=s[k]; });
+  // Grenzen zusammenführen statt ersetzen: fehlen sie im Backup (alte App), bleiben die aktuellen Werte erhalten.
+  settings.thr=Object.assign({},SET_DEFAULT.thr,curThr||{},(s.thr&&typeof s.thr==='object')?s.thr:{});
+  if(!['a','b','c'].includes(settings.plusMode)) settings.plusMode='c';
   saveSettings(); applyTheme(); applySettingsUI(); renderTable();
   if(currentTab==='chart') renderChart();
   toast('Einstellungen übernommen');
@@ -1179,19 +1393,20 @@ function importJSON(file){
 
 /* Alle Messwerte löschen. Die externe Backup-Datei bleibt erhalten und wird NICHT überschrieben:
    Auto-Backup wird abgebrochen und die Verknüpfung gelöst. */
+const joinUnd=a=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' und '+a[a.length-1];
 async function clearAllData(){
-  const n=entries.length;
+  const n=totalCount(), parts=countParts(), word=n===1?'Messung':'Messungen';
   const ok=await askConfirm({
     icon:'trash',tone:'danger',danger:true,title:'Alle Daten löschen?',
-    messageHTML:'Alle <b>'+n+' Messwerte</b> werden dauerhaft gelöscht. Das lässt sich nicht rückgängig machen.',
+    messageHTML:(n===1?'Die <b>1 Messung</b> wird':'Alle <b>'+n+' '+word+'</b> werden')+' dauerhaft gelöscht'+(parts.length?': '+joinUnd(parts):'')+'. Das lässt sich nicht rückgängig machen.',
     noteText:'Eine bereits gespeicherte Backup-Datei bleibt erhalten, wird aber nicht mehr automatisch aktualisiert.',
-    requireCheck:'Ja, ich möchte alle '+n+' Werte löschen',confirmLabel:'Alle löschen'
+    requireCheck:'Ja, ich möchte alle '+n+' '+word+' löschen',confirmLabel:'Alle löschen'
   });
   if(!ok) return;
   clearTimeout(_abT);                         // kein Auto-Backup der leeren Liste auslösen
-  entries=[];
-  try{ localStorage.removeItem(LS_KEY); }catch{}
-  try{ if(_db){ await idbWriteAll([]); await idbSetMeta('backupHandle',null); } }catch{}
+  entries=[]; vitals=[];
+  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_VIT); }catch{}
+  try{ if(_db){ await idbWriteAll([]); await idbWriteAllV([]); await idbSetMeta('backupHandle',null); } }catch{}
   markBackedUp(); refreshData();
   $('#menuDlg').close();
   toast('Alle Daten gelöscht');
@@ -1276,7 +1491,7 @@ function markDirty(){ if(!settings.firstDirtyAt){ settings.firstDirtyAt=new Date
 function markBackedUp(){ settings.firstDirtyAt=null; settings.snoozeUntil=0; persistSettings(); updateReminder(); }   // persistSettings statt saveSettings: kein erneutes Auto-Backup (sonst Endlosschleife)
 function reminderDaysDue(){
   const d=+settings.reminderDays||0;
-  if(d<=0||!entries.length||!settings.firstDirtyAt) return 0;
+  if(d<=0||!totalCount()||!settings.firstDirtyAt) return 0;
   if(Date.now()<(settings.snoozeUntil||0)) return 0;
   const days=Math.floor((Date.now()-new Date(settings.firstDirtyAt).getTime())/DAY);
   return days>=d?days:0;
@@ -1466,7 +1681,7 @@ function reportData(from,to){
   const asc=list.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const desc=list.slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
   const avgSys=meanKey(list,'sys'), avgDia=meanKey(list,'dia'), avgPul=meanKey(list,'pulse');
-  const mm=k=>({min:list.length?Math.min(...list.map(m=>m[k])):0, max:list.length?Math.max(...list.map(m=>m[k])):0});
+  const mm=k=>{ const v=list.map(m=>m[k]).filter(Number.isFinite); return {min:v.length?Math.min(...v):'—', max:v.length?Math.max(...v):'—'}; };
   const win=key=>{ const a=list.filter(m=>todOf(new Date(m.ts).getHours())===key);
     const s=meanKey(a,'sys'), d=meanKey(a,'dia'), p=meanKey(a,'pulse');
     return {n:a.length, sys:s, dia:d, pul:p, cat:a.length?category({sys:s,dia:d}):'n'}; };
@@ -1548,12 +1763,13 @@ function rpChart(rep,W,showPuls,acc,detailed){
     s+=`<text x="${xs[i]}" y="${yb(m.sys)-9}" font-size="9" font-weight="800" fill="${catInk('sys',m.sys)}" text-anchor="middle">${m.sys}</text>`;
     s+=`<text x="${xs[i]}" y="${yb(m.dia)+16}" font-size="9" font-weight="800" fill="${catInk('dia',m.dia)}" text-anchor="middle">${m.dia}</text>`;
   }); }
-  if(showPuls){
-    const pv=list.map(m=>m.pulse), pmn=Math.min(...pv), pmx=Math.max(...pv), pmin=pmn-4, pmax=pmx+4;
+  const pIdx=list.map((m,i)=>i).filter(i=>Number.isFinite(list[i].pulse));   // Messungen ohne Puls auslassen
+  if(showPuls&&pIdx.length){
+    const pv=pIdx.map(i=>list[i].pulse), pmn=Math.min(...pv), pmx=Math.max(...pv), pmin=pmn-4, pmax=pmx+4;
     const yp=v=>+(pulBot-(v-pmin)/((pmax-pmin)||1)*(pulBot-pulTop)).toFixed(1);
     s+=`<line x1="${padL}" y1="${pulTop-10}" x2="${W-padR}" y2="${pulTop-10}" stroke="${RP.line}" stroke-width="1"/>`;
-    s+=`<polyline points="${list.map((m,i)=>xs[i]+','+yp(m.pulse)).join(' ')}" fill="none" stroke="${RP.pulse.bar}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>`;
-    list.forEach((m,i)=>{ s+=`<circle cx="${xs[i]}" cy="${yp(m.pulse)}" r="2.7" fill="${RP.pulse.bar}" stroke="#fff" stroke-width="1"/>`; });
+    s+=`<polyline points="${pIdx.map(i=>xs[i]+','+yp(list[i].pulse)).join(' ')}" fill="none" stroke="${RP.pulse.bar}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>`;
+    pIdx.forEach(i=>{ s+=`<circle cx="${xs[i]}" cy="${yp(list[i].pulse)}" r="2.7" fill="${RP.pulse.bar}" stroke="#fff" stroke-width="1"/>`; });
     s+=`<text x="2" y="${pulTop-14}" font-size="9" font-weight="800" fill="${RP.pulse.ink}" letter-spacing=".08em">PULS</text>`;
     s+=`<text x="${W-padR+4}" y="${yp(pmx)+3}" font-size="9" font-weight="700" fill="${RP.pulse.ink}">${pmx}</text>`;
     s+=`<text x="${W-padR+4}" y="${yp(pmn)+3}" font-size="9" font-weight="700" fill="${RP.pulse.ink}">${pmn}</text>`;
@@ -1588,7 +1804,7 @@ function rpTable(rep,opt){
       +`<div style="font-size:11.5px;font-weight:600;color:${RP.muted}">${fmtTime(m.ts)}</div>`
       +valCell(m.sys,catValFor('sys',m.sys),true)
       +valCell(m.dia,catValFor('dia',m.dia),false)
-      +(puls?`<div style="text-align:right;font-size:12.5px;font-weight:700;color:${RP.pulse.ink}">${m.pulse}</div>`:'')
+      +(puls?`<div style="text-align:right;font-size:12.5px;font-weight:700;color:${RP.pulse.ink}">${Number.isFinite(m.pulse)?m.pulse:'—'}</div>`:'')
       +`<div style="font-size:11px;font-weight:500;color:${RP.muted};line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.note?escapeHtml(m.note):'—'}</div></div>`;
   });
   return head+rows;
@@ -1611,10 +1827,10 @@ function rpPage(rep){
 
   const stat=(v,lab,col,last)=>`<div style="flex:1;text-align:center;padding:2px 4px${last?'':';border-right:1px solid '+RP.line}"><div style="font-size:30px;font-weight:800;color:${col};letter-spacing:-.02em;line-height:1">${v}</div><div style="font-size:9.5px;font-weight:800;letter-spacing:.07em;color:${RP.muted};margin-top:6px">${lab}</div></div>`;
   const sysdiaTile=tile(`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">${mini('DURCHSCHNITT SYS / DIA')}${rpChip(rep.catAvg,true)}</div><div style="display:flex;align-items:stretch">${stat(rep.avgSys,'Ø SYSTOLISCH',RP.amp[catValFor('sys',rep.avgSys)].ink)}${stat(rep.avgDia,'Ø DIASTOLISCH',RP.amp[catValFor('dia',rep.avgDia)].ink,true)}</div>`,';flex:2');
-  const pulsTile=tile(`<div style="margin-bottom:12px">${mini('DURCHSCHNITT PULS')}</div><div style="display:flex;align-items:stretch">${stat(rep.avgPul,'Ø PULS · BPM',RP.pulse.ink,true)}</div>`,';flex:1');
+  const pulsTile=tile(`<div style="margin-bottom:12px">${mini('DURCHSCHNITT PULS')}</div><div style="display:flex;align-items:stretch">${stat(rep.avgPul!=null?rep.avgPul:'—','Ø PULS · BPM',RP.pulse.ink,true)}</div>`,';flex:1');
   const gesamt=`<div class="rp-blk" style="display:flex;gap:13px;align-items:stretch">${sysdiaTile}${puls?pulsTile:''}</div>`;
 
-  const todTile=(name,w)=>`<div style="flex:1;background:${RP.surf};border:1px solid ${RP.line};border-radius:12px;padding:11px 12px"><div style="font-size:11px;font-weight:800;color:${RP.ink};margin-bottom:6px">${name}</div>${w.n===0?`<div style="font-size:22px;font-weight:800;color:#c2cad6">—</div>`:`<div><div style="display:flex;align-items:baseline;gap:3px"><span style="font-size:22px;font-weight:800;color:${RP.amp[catValFor('sys',w.sys)].ink}">${w.sys}</span><span style="font-size:15px;color:#c2cad6;font-weight:500">/</span><span style="font-size:22px;font-weight:800;color:${RP.amp[catValFor('dia',w.dia)].ink}">${w.dia}</span></div><div style="font-size:10.5px;font-weight:600;color:${RP.muted};margin-top:4px">${puls?'Puls '+w.pul+' · ':''}${w.n} Messung${w.n===1?'':'en'}</div></div>`}</div>`;
+  const todTile=(name,w)=>`<div style="flex:1;background:${RP.surf};border:1px solid ${RP.line};border-radius:12px;padding:11px 12px"><div style="font-size:11px;font-weight:800;color:${RP.ink};margin-bottom:6px">${name}</div>${w.n===0?`<div style="font-size:22px;font-weight:800;color:#c2cad6">—</div>`:`<div><div style="display:flex;align-items:baseline;gap:3px"><span style="font-size:22px;font-weight:800;color:${RP.amp[catValFor('sys',w.sys)].ink}">${w.sys}</span><span style="font-size:15px;color:#c2cad6;font-weight:500">/</span><span style="font-size:22px;font-weight:800;color:${RP.amp[catValFor('dia',w.dia)].ink}">${w.dia}</span></div><div style="font-size:10.5px;font-weight:600;color:${RP.muted};margin-top:4px">${puls&&w.pul!=null?'Puls '+w.pul+' · ':''}${w.n} Messung${w.n===1?'':'en'}</div></div>`}</div>`;
   const tageszeit=tile(mini('DURCHSCHNITT NACH TAGESZEIT')+`<div style="display:flex;gap:9px">${todTile('Morgens',rep.tod.morgens)}${todTile('Tagsüber',rep.tod.tags)}${todTile('Abends',rep.tod.abends)}</div>`);
 
   const legRow=(cat,cnt,p)=>`<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="width:10px;height:10px;border-radius:3px;background:${RP.amp[cat].bar};flex:none"></span><span style="font-size:12px;font-weight:700;color:${RP.ink}">${RP.amp[cat].label}</span><span style="margin-left:auto;font-size:12px;font-weight:700;color:${RP.muted}"><b style="color:${RP.ink}">${cnt}</b> · ${p}%</span></div>`;
@@ -1713,7 +1929,7 @@ function showTab(name){
   if(name==='report') renderReport();
 }
 $$('.navbtn[data-tab]').forEach(b=>b.addEventListener('click',()=>goMainTab(b.dataset.tab)));   // Menü-Button (ohne data-tab) löst keinen Tab-Wechsel aus
-$('#fabCapture').addEventListener('click',()=>startCapture());                                 // zentraler +-Knopf → neue Messung
+$('#fabCapture').addEventListener('click',openPlus);                                           // zentraler +-Knopf → neue Messung (je nach plusMode)
 
 /* ---------- Navigation & nativer Zurück-Knopf (Android) ----------
    Modell: Der echte Browser-Verlauf bildet die App-Navigation 1:1 ab. Jede „Ebene" – ein Screen ODER
@@ -1733,7 +1949,7 @@ $('#fabCapture').addEventListener('click',()=>startCapture());                  
    Verlaufs-Eintrag (wird beim nächsten Zeichnen mit-geschlossen). */
 
 let viewStack=[{screen:'dashboard',sheet:null}];
-const NAV_SHEETS=['#capDtSheet','#capNoteSheet','#rangeSheet','#dgPop'];
+const NAV_SHEETS=['#capDtSheet','#capNoteSheet','#rangeSheet','#dgPop','#plusSheet'];
 /* Sichtbares an die oberste Ebene angleichen: richtiger Screen + genau das dazugehörige Sheet. Den
    Screen NUR wechseln, wenn er sich ändert – sonst bliebe z. B. die Erfassen-Eingabe nicht erhalten. */
 function applyTop(){

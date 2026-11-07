@@ -287,66 +287,61 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .toast-card.error{background:#fdeceb;color:#b3261e}
 .toast-card.error .t-ic{color:#d93025}
 
-/* ---------- Dashboard (Startseite) ---------- */
-.dash-head{display:flex;justify-content:space-between;align-items:flex-end;padding:2px 2px 0;margin-bottom:13px}
-.dash-title{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
-.dash-sub{font-size:13px;color:var(--muted);font-weight:500;text-transform:capitalize}
-#dashboard{display:flex;flex-direction:column;gap:13px}
+/* ---------- Dashboard (Startseite) ----------
+   „Letzte Messung + 7 Tage" (Entwurf 2026-11-06): eigene Karten je Wert, Symbol im getönten Kästchen,
+   Name fett + graue Zeile, große Zahl in Ampelfarbe, darunter Ampel-Punkt + Ampel-Wort. */
+.dash-head{display:flex;justify-content:space-between;align-items:flex-end;padding:2px 2px 0;margin-bottom:6px}
+.dash-title{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+.dash-sub{font-size:12px;color:var(--muted);font-weight:600;text-transform:capitalize;margin-top:2px}
+#dashboard{display:flex;flex-direction:column;gap:8px;padding-bottom:12px}
+.dsec{margin:6px 2px 0;font-size:15px;font-weight:800;line-height:1.3;color:var(--ink)}
 .dcard{background:var(--surf);border:1px solid var(--line);border-radius:var(--cardr)}
-.dcard-pad{padding:15px 16px}
-.dhero-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
-.dhead-l{display:flex;align-items:center;gap:9px}
+button.dcard{font:inherit;color:inherit;text-align:left;width:100%;cursor:pointer;transition:transform .12s ease,background-color .2s ease}
+button.dcard:active{transform:scale(.985);background:var(--surf2)}
+.dhead-l{display:flex;align-items:center;gap:8px;min-width:0}
+.dhead-tx{display:flex;flex-direction:column;min-width:0}
 .dicon{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 .dicon svg{width:18px;height:18px}
 .dicon.pulse{background:var(--pulse-soft);color:var(--pulse-ink)}
 .dicon.pulse svg{width:15px;height:15px}
 .dhead-t1{font-size:12.5px;font-weight:800;color:var(--ink);line-height:1.15}
-.dhead-t2{font-size:10.5px;font-weight:600;color:var(--muted);line-height:1.15}
-.dpill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;font-weight:700;font-size:12.5px;padding:5px 11px;white-space:nowrap}
-.ddot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.dhero-nums{display:flex;align-items:flex-end;gap:8px}
-.dbig{display:flex;flex-direction:column;align-items:center;line-height:1}
-.dbig .n{font-family:var(--numfont);font-size:46px;font-weight:800;letter-spacing:-.03em;line-height:.88;font-variant-numeric:tabular-nums}
-.dbig .l{font-size:9px;font-weight:800;letter-spacing:.07em;margin-top:5px}
-.dslash{font-size:30px;color:var(--muted);opacity:.5;font-weight:600;padding-bottom:15px}
-.dhero-side{margin-left:auto;text-align:right;padding-bottom:3px}
-.dhero-side .u{font-size:11px;color:var(--muted);font-weight:600}
-.dhero-side .p{font-size:15px;font-weight:700;color:var(--ink);margin-top:3px;font-variant-numeric:tabular-nums}
-.dtiles{display:flex;gap:10px}
-.dtile{flex:1;min-width:0;background:var(--surf);border:1px solid var(--line);border-radius:var(--cardr);padding:11px 12px;display:flex;flex-direction:column;gap:9px}
-.dtile.wide{flex:2}
-.dtile-avgs{display:flex;align-items:stretch;gap:6px}
-.dtile-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
-.dtile-cell{display:flex;flex-direction:column;align-items:center;line-height:1}
-.dtile-pulse{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
-.dtile-num{font-family:var(--numfont);font-size:25px;font-weight:800;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
-.dtile-lbl{font-size:9px;font-weight:800;color:var(--muted);letter-spacing:.07em;margin-top:3px}
-.dtile-div{width:1px;background:var(--line)}
-.dtrend{display:inline-flex;align-items:center;gap:3px;background:var(--surf2);color:var(--muted);border-radius:999px;padding:3px 8px 3px 6px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}
-.dtrend svg{width:10px;height:10px}
-.dtile-foot{font-size:9px;font-weight:600;color:var(--muted);text-align:center;opacity:.85}
-.ddist-body{display:flex;align-items:center;gap:18px;padding:1px 2px 2px}
-.ring{position:relative;width:88px;height:88px;flex:0 0 auto;border-radius:50%}
-/* Farbring als eigene Ebene, damit die Aufdeck-Maske (--sweep) nicht die Mitte (.ring-c) trifft */
-.ring-fill{position:absolute;inset:0;border-radius:50%;--sweep:360deg;-webkit-mask:conic-gradient(#000 var(--sweep),#0000 var(--sweep));mask:conic-gradient(#000 var(--sweep),#0000 var(--sweep))}
-.ring-c{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:var(--surf);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
-.ring-pct{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
-.ring-lbl{font-size:8.5px;font-weight:700;color:var(--muted);margin-top:2px}
-.dleg{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
-.dleg-row{display:flex;align-items:center;gap:8px}
-.dleg-sq{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
-.dleg-name{font-size:12px;font-weight:700;color:var(--ink)}
-.dleg-val{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.dleg-val b{color:var(--ink)}
+.dhead-t2{font-size:10.5px;font-weight:600;color:var(--muted);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.dword{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;white-space:nowrap}
+/* Letzte Messung */
+.dlm{display:flex;flex-direction:column;gap:8px;padding:11px 12px 12px;min-width:0}
+.dlm-bp{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:12px}
+.dlm-main,.dlm-pul{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dlm-pul{padding-left:12px;border-left:1px solid var(--line)}
+.dlm-val{white-space:nowrap;line-height:1.05}
+.dlm-n{font-size:36px;font-weight:800;letter-spacing:-.03em}
+.dlm-val.sm .dlm-n{font-size:30px;letter-spacing:-.02em}
+.dlm-u{font-size:12px;font-weight:800}
+.dlm-val+.dword{margin-top:-6px}
+.dlm-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dlm-none{opacity:.75}
+/* Letzte 7 Tage */
+.dst{display:flex;flex-direction:column;padding:0}
+.dst-top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px 12px}
+.dst-pulse{border-top:1px solid var(--line)}
+.dst-avg{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;min-width:0}
+.dst-v{white-space:nowrap;line-height:1.1}
+.dst-o{font-size:17px;font-weight:700}
+.dst-n{font-size:27px;font-weight:800;letter-spacing:-.03em}
+.dst-u{font-size:12.5px;font-weight:800}
+.dst-empty{display:flex;flex-direction:column;gap:1px;text-align:right;min-width:0}
+.dst-empty b{font-size:15px;font-weight:800;color:var(--ink)}
+.dst-empty span{font-size:12.5px;font-weight:600;color:var(--muted)}
+.dst-pulse .dst-empty b{color:var(--muted)}
 /* Karten-Einblendung (gestaffelt) */
 @keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 #dashboard>*{animation:riseIn .42s ease both}
-/* Karten kaskadieren leicht versetzt herein (wie im Entwurf) */
-#dashboard>*:nth-child(2){animation-delay:.06s}
-#dashboard>*:nth-child(3){animation-delay:.12s}
-#dashboard>*:nth-child(2){animation-delay:.06s}
-#dashboard>*:nth-child(3){animation-delay:.12s}
-#dashboard>*:nth-child(4){animation-delay:.18s}
+#dashboard>*:nth-child(2){animation-delay:.04s}
+#dashboard>*:nth-child(3){animation-delay:.08s}
+#dashboard>*:nth-child(4){animation-delay:.12s}
+#dashboard>*:nth-child(5){animation-delay:.16s}
+#dashboard>*:nth-child(6){animation-delay:.2s}
+#dashboard>*:nth-child(7){animation-delay:.24s}
 @media (prefers-reduced-motion:reduce){#dashboard>*{animation:none}}
 
 /* ================= Erfassen (geführte Eingabe) =================
@@ -419,6 +414,40 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .cap-key-sp{height:46px}
 .cap-key-bk{background:var(--surf2)}
 .cap-key-bk svg{width:26px;height:26px}
+
+/* Kacheln sind jetzt Knöpfe (von app.js je Feldliste gebaut) – Knopf-Standardoptik zurücksetzen */
+button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;color:inherit;text-align:center}
+.cap-tile-box{display:block}
+.cap-tile-seg,.cap-tile-val{display:block}
+/* Durchgang C (5 Felder): schmalere Kacheln, Ampel nur als Kachelfarbe (keine Pille darüber) */
+.cap-seg.compact .cap-seg-inner{gap:6px}
+.cap-seg.compact .cap-tile-pill{display:none}
+.cap-seg.compact .cap-ink{top:0}
+.cap-seg.compact .cap-tile-box{padding:9px 2px}
+.cap-seg.compact .cap-tile-val{font-size:17px}
+/* Variante B: Umschalter Blutdruck · Temperatur · Sauerstoff */
+.cap-switch{flex:none;display:flex;gap:4px;margin:8px 16px 0;padding:4px;border-radius:999px;background:var(--surf2)}
+.cap-switch button{flex:1;min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:background-color .2s ease,color .2s ease}
+.cap-switch button.active{background:var(--accent);color:var(--accent-ink)}
+/* Ampel des aktuellen Felds unter der Zahl; über 100 % rot */
+.cap-cur{min-height:28px;display:flex;align-items:center;justify-content:center}
+.cap-pill.lg{font-size:13px;padding:5px 12px;gap:6px;font-weight:700}
+.cap-pill.lg .d{width:9px;height:9px}
+.cap-big.over{color:var(--r-ink)}
+.cap-hint.err{color:var(--r-ink)}
+.cap-acc-r{display:flex;align-items:center;gap:4px}
+.cap-skip{background:none;border:none;color:var(--muted);font-weight:800;font-size:13.5px;min-height:44px;padding:0 10px}
+
+/* Großes +, Variante A: Auswahl-Blatt */
+.plus-panel{display:flex;flex-direction:column;gap:8px}
+.plus-panel .cap-sheet-title{margin-bottom:4px}
+.plus-opt{min-height:64px;display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line);border-radius:16px;background:var(--surf);color:var(--ink);text-align:left;padding:10px 14px}
+.plus-opt:active{background:var(--surf2)}
+.plus-ic{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 14%,var(--surf));color:var(--accent)}
+.plus-ic svg{width:22px;height:22px}
+.plus-txt{flex:1;display:flex;flex-direction:column;line-height:1.3}
+.plus-txt b{font-size:15px;font-weight:800}
+.plus-txt span{font-size:12.5px;font-weight:600;color:var(--muted)}
 
 /* Speichern-Bestätigung */
 .cap-save{position:absolute;inset:0;z-index:14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
@@ -510,6 +539,13 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .vh-c-p{width:46px;text-align:right}
 .vh-c-chev{width:20px}
 
+/* ---- Umschalter Blutdruck · Temperatur · Sauerstoff (Verlauf + Diagramm) ---- */
+.metric-seg{flex:none;display:flex;gap:4px;margin:2px 16px 6px;padding:3px;border-radius:999px;background:var(--surf2);border:1px solid var(--line)}
+.metric-seg button{flex:1;min-height:40px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:background-color .2s ease,color .2s ease}
+.metric-seg button.active{background:var(--surf);color:var(--accent);box-shadow:0 1px 3px rgba(20,30,50,.14)}
+.vh-c-m{text-align:right}
+.vrow-m{text-align:right;font-size:15px;font-weight:800;white-space:nowrap}
+
 /* ---- Verlauf: scrollbare Liste ---- */
 .vh-scroll{flex:1;min-height:0;position:relative}
 #vList{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -583,6 +619,10 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .det-scale-bar{position:relative;height:12px;border-radius:6px}
 .det-scale-mk{position:absolute;top:50%;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;border:2.5px solid var(--surf);box-shadow:0 1px 3px rgba(20,30,50,.3);animation:markerGlide .5s cubic-bezier(.22,.61,.36,1) both}
 
+.det-unit{font-size:20px;font-weight:800;padding-bottom:22px}
+.det-ticks{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;color:var(--muted)}
+.det-info{display:flex;gap:9px;align-items:flex-start}
+.det-info svg{width:17px;height:17px;flex:none;margin-top:1px}
 .det-ctx{font-size:12.5px;line-height:1.5;color:var(--muted);padding:0 2px}
 .det-ctx b{color:var(--ink);font-weight:600}
 .det-note{padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
@@ -637,7 +677,11 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .dg-legend.single{justify-content:space-between}
 .dg-legend .avg{display:inline-flex;align-items:center;gap:5px}
 .dg-legend .avg i{width:15px;height:0;border-top:2px dashed;display:inline-block}
-.dg-legend .cnts{display:inline-flex;align-items:center;gap:9px}
+.dg-legend .cnts{display:inline-flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+/* Temperatur/Sauerstoff: nur der Zeitraum in der Steuerleiste (Sys/Dia/Beide/Puls ausgeblendet) */
+.dg-range-lbl{display:none}
+.dg-controls.only-range .dg-seg,.dg-controls.only-range .dg-pulse{display:none}
+.dg-controls.only-range .dg-range-lbl{display:block;flex:1;font-size:12.5px;font-weight:700;color:var(--muted)}
 
 .dg-stat3{display:flex;gap:8px}
 .dg-stat{flex:1;background:var(--surf);border:1px solid var(--line);border-radius:var(--cardr);padding:9px 8px;text-align:center}

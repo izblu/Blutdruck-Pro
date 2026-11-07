@@ -1,6 +1,6 @@
 # Dashboard – Datenspezifikation
 
-Stand: 2026-07-02. Diese Datei beschreibt **was** das Dashboard rechnet und anzeigt –
+Stand: 2026-07-02, neu gefasst 2026-11-07 (Dashboard „Letzte Messung + 7 Tage“ mit Temperatur und Sauerstoff). Diese Datei beschreibt **was** das Dashboard rechnet und anzeigt –
 nicht wie es aussieht.
 
 - **Fix (Logik/Daten):** Kennzahlen, Berechnung, Zeitfenster, Ampel-Regeln, Leerzustände.
@@ -26,38 +26,32 @@ nicht wie es aussieht.
 
 ## 1. Kennzahlen
 
-### 1.1 Letzte Messung (Kopfelement)
+Seit 2026-11-07 zeigt das Dashboard alle vier Werte (Blutdruck, Puls, Temperatur, Sauerstoff) in zwei klar getrennten
+Bereichen: oben „Letzte Messung", darunter „Letzte 7 Tage". Überschrift „Dashboard", darunter Wochentag und Datum.
+
+### 1.1 Letzte Messung (eigene Karten)
 - **Zweck:** „Wie stehe ich gerade?"
-- **Inhalt:** Sys/Dia, Puls, Zeitpunkt, **Gesamt-Ampelfarbe** (`category()`).
-- **Fenster:** die jüngste einzelne Messung (kein Zeitfenster).
-- **Zeitangabe:** absolut (Datum/Uhrzeit) *und* relativ („vor 3 Std.") beide verfügbar –
-  welche gezeigt wird, entscheidet Design.
-- **Leerzustand:** „Noch keine Messung erfasst."
+- **Karten:** Blutdruck + Puls (eine Karte, eine Messung) · Temperatur · Sauerstoff.
+- **Inhalt:** Zahl mit Einheit in Ampelfarbe, Ampel-Punkt und **Ampel-Wort** (Blutdruck: `category()`, Temperatur und
+  Sauerstoff: `catMetric`). Puls in Puls-Farbe ohne Ampel. Zeitpunkt **relativ** („vor 2 Std.", `relTime`).
+- **Antippen:** öffnet das Detail dieser Messung.
+- **Leerzustand:** Gibt es von einem Wert noch nichts, steht in seiner Karte „Noch kein Wert".
 
-### 1.2 Ø Sys/Dia (7 Tage) + Trend
-- **Zweck:** geglätteter aktueller Stand + Richtung.
-- **Berechnung:** Mittelwert von `sys` und `dia` im 7-Tage-Fenster.
-  Trend = Ø(letzte 7 Tage) − Ø(die 7 Tage davor), **je Wert**, in mmHg.
-- **Vorzeichen:** − = gesunken (↓), + = gestiegen (↑), ~0 = gleich (→).
-  Pfeil **neutral** halten (keine Wertung gut/schlecht – die Farbe trägt die Gesamt-Ampel).
-- **Fenster:** 0–7 Tage; Vergleichszeitraum 7–14 Tage.
-- **Leerzustand:** keine Werte in 7 Tagen → „—". Trend nur zeigen, wenn **beide** Fenster
-  mindestens 1 Messung haben (sonst kein Trend). Braucht praktisch ~14 Tage Daten.
-- **Darstellung (Empfehlung, Design entscheidet):** Trend **an der Durchschnitts-Kachel**
-  statt als eigene, bezuglose Kachel – z. B. groß `132/82`, klein `↓ 4 / ↓ 2 vs. Vorwoche`.
+### 1.2 Ø Blutdruck (7 Tage) mit Ø Puls
+- **Berechnung:** Mittelwert von `sys`, `dia` und `pulse` im 7-Tage-Fenster (168 h, rollierend, fest).
+- **Erst ab 3 Messungen.** Bei 1–2: „Zu wenige Messungen · Ø erst ab 3 Messungen". Bei 0: „Keine Messung in den
+  letzten 7 Tagen".
+- **Ampelfarbe + Wort** über `category()` auf dem gerundeten Ø. Puls ohne Ampel.
+- **Kein Trend** zur Vorwoche mehr (entfällt).
 
-### 1.3 Ø Puls (7 Tage) + Trend
-- Wie 1.2, aber für `pulse`. **Keine Ampel** (Puls hat keine Schwellenwerte).
+### 1.3 Ø Temperatur und Ø Sauerstoff (7 Tage)
+- Wie 1.2, je eigene Karte. Temperatur auf eine Nachkommastelle, Sauerstoff ganzzahlig, Ampel über `catMetric`.
 
-### 1.4 Ampel-Verteilung (30 Tage) + Anzahl
-- **Zweck:** Gesamtbild „wie oft im grünen/gelben/roten Bereich".
-- **Berechnung:** für jede Messung im Fenster `category()` bestimmen, je Farbe zählen → Prozent.
-  Zusätzlich die **Anzahl** der Messungen im Fenster ausweisen (ordnet die Prozente ein:
-  8 % von 24 heißt etwas, 8 % von 3 nicht).
-- **Rundung:** Prozente ganzzahlig, so runden, dass die Summe **100 %** ergibt.
-- **Fenster:** rollierende 30 Tage.
-- **Leerzustand:** 0 Messungen → „Noch keine Daten in den letzten 30 Tagen."
-- **Darstellung (Design):** z. B. gestapelter Balken; Anzahl daneben („aus 24 Messungen").
+### 1.4 Entfallen
+- **Ampel-Verteilung 30 Tage** (Ring, Prozente, Anzahl) samt Ring-Animation entfällt ersatzlos. Den Überblick
+  „im Ziel?" gibt die Ampelfarbe des Ø.
+- Ebenso entfallen: Trend zur Vorwoche, „x von y im Ziel", Punktreihe.
+- **Antippen** einer 7-Tage-Karte öffnet das Diagramm mit diesem Wert und dem Zeitraum 7 Tage.
 
 ---
 
@@ -88,7 +82,7 @@ nicht wie es aussieht.
 ## 4. Bewusst (noch) nicht im Dashboard
 
 - **Morgens/abends getrennt** – später möglich (die Uhrzeit steckt in `ts`), aktuell nicht nötig.
-- **Zielwert-Abgleich** (Schnitt gegen `settings.thr`) – optional, später entscheidbar.
+- ~~Zielwert-Abgleich (Schnitt gegen `settings.thr`)~~ – umgesetzt 2026-11-07: der Ø trägt die Ampelfarbe.
 - **Keine Bewertung/Diagnose** – nur beschreiben, nicht einordnen.
 
 ---
