@@ -35,6 +35,7 @@
   --text:var(--ink); --border:var(--line);
   --primary:var(--accent); --primary-ink:var(--accent-ink);
   --accent-soft:color-mix(in srgb,var(--accent) 13%,transparent);
+  --scrim:rgba(15,23,42,.62);
   --cat-g:var(--g-bar); --cat-y:var(--y-bar); --cat-r:var(--r-bar);
   --danger:var(--r-bar);
   --c-sys:var(--r-bar); --c-dia:var(--accent); --c-pulse:var(--pulse-bar);
@@ -49,6 +50,7 @@
     --r-ink:#f87171; --r-soft:rgba(239,68,68,.16); --r-bar:#ef4444;
     --pulse-ink:#fb7aa8; --pulse-soft:rgba(225,29,104,.20); --pulse-bar:#fb7aa8;
     --shadow:0 1px 3px rgba(0,0,0,.4); --panel-shadow:0 6px 18px rgba(0,0,0,.45);
+    --scrim:rgba(0,0,0,.72);
   }
 }
 :root[data-theme="dark"]{
@@ -59,6 +61,7 @@
   --r-ink:#f87171; --r-soft:rgba(239,68,68,.16); --r-bar:#ef4444;
   --pulse-ink:#fb7aa8; --pulse-soft:rgba(225,29,104,.20); --pulse-bar:#fb7aa8;
   --shadow:0 1px 3px rgba(0,0,0,.4); --panel-shadow:0 6px 18px rgba(0,0,0,.45);
+  --scrim:rgba(0,0,0,.72);
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}   /* sonst überschreibt z. B. .reminder{display:flex} das hidden-Attribut */
@@ -339,6 +342,65 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 @media (prefers-reduced-motion:reduce){
   .acc-sec,.acc-head .chev,.tp-btn,.acc-dot,.acc-sw .ck,.hlp,.hlp-ic,.hlp-head .chev{transition:none}
 }
+
+/* ==== Installations-Assistent (Entwürfe Assistent*.dc.html): bildschirmfüllendes modales Fenster,
+   abgedunkelte App dahinter (inert), Karte oben, Pfeil zur Safari-Leiste bzw. zum Browser-Menü ==== */
+#instDlg{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;box-sizing:border-box;
+  padding:calc(env(safe-area-inset-top) + 76px) 16px calc(env(safe-area-inset-bottom) + 96px);
+  border:0;border-radius:0;background:var(--scrim);box-shadow:none;overflow-y:auto;color:var(--ink)}
+#instDlg[open]{display:block}
+#instDlg::backdrop{background:transparent}
+#instDlg.arrow-top{padding-top:calc(env(safe-area-inset-top) + 100px)}
+#instDlg.center{background:var(--bg);padding-top:calc(env(safe-area-inset-top) + 16px);padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
+#instDlg.center[open]{display:flex;flex-direction:column;justify-content:center}
+.inst-card{max-width:420px;margin:0 auto;background:var(--surf);border-radius:24px;padding:20px 18px 16px;display:flex;flex-direction:column;gap:12px}
+#instDlg.center .inst-card{width:100%;box-sizing:border-box;border:1px solid var(--line);padding:22px 18px 16px}
+.inst-head{display:flex;align-items:center;justify-content:space-between;min-height:24px}
+.inst-lbl{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--accent);text-transform:uppercase}
+.inst-dots{display:flex;gap:5px}
+.inst-dots span{width:20px;height:4px;border-radius:2px;background:var(--line)}
+.inst-dots span.on{background:var(--accent)}
+.inst-t{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.inst-p{margin:0;font-size:15px;font-weight:500;line-height:1.45;color:var(--muted)}
+.inst-ok{width:58px;height:58px;border-radius:50%;background:var(--g-soft);color:var(--g-ink);display:grid;place-items:center}
+.inst-ok svg{width:30px;height:30px}
+.inst-box{background:var(--surf2);border-radius:16px}
+.inst-share{display:flex;align-items:center;justify-content:center;gap:18px;padding:16px}
+.inst-key{width:58px;height:58px;box-sizing:border-box;border-radius:14px;background:var(--surf);border:2px solid var(--line);color:var(--ink);display:grid;place-items:center;font-size:24px;font-weight:800;letter-spacing:.05em}
+.inst-key.on{border-color:var(--accent);color:var(--accent)}
+.inst-key svg{width:30px;height:30px}
+.inst-or{font-size:13px;font-weight:700;color:var(--muted)}
+.inst-list{padding:6px;display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600}
+.inst-list div{padding:10px 12px;color:var(--muted)}
+.inst-list div.on,.inst-add-bar .on{border:2px solid var(--accent);background:var(--accent-soft);color:var(--ink);font-weight:800}
+.inst-list div.on{border-radius:11px;display:flex;align-items:center;justify-content:space-between}
+.inst-list svg{width:20px;height:20px}
+.inst-add{padding:12px;display:flex;flex-direction:column;gap:12px}
+.inst-add-bar{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:700;color:var(--muted)}
+.inst-add-bar .on{padding:5px 10px;border-radius:10px}
+.inst-add-app{display:flex;align-items:center;gap:12px}
+.inst-add-app b{display:block;font-size:14.5px;font-weight:800}
+.inst-add-app small{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.inst-icon{width:46px;height:46px;flex:0 0 auto;display:block}
+.inst-icon svg{width:100%;height:100%;display:block}
+.inst-icon.big{width:64px;height:64px}
+.inst-url{padding:12px;font-size:13.5px;font-weight:700;word-break:break-all;-webkit-user-select:all;user-select:all}
+.inst-num{margin:0;padding:12px;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14.5px;font-weight:700;line-height:1.35}
+.inst-num li{display:flex;gap:10px}
+.inst-num li span{width:24px;height:24px;flex:0 0 auto;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:13px;font-weight:800}
+.inst-btns{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.inst-main{min-height:50px;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:15.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.inst-main.hl{min-height:54px;box-shadow:0 0 0 5px var(--accent-soft)}
+.inst-sec{min-height:44px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.inst-arrow{position:fixed;display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;font-size:13px;font-weight:700;pointer-events:none}
+.inst-arrow[hidden]{display:none}
+.inst-arrow svg{width:42px;height:42px}
+.inst-arrow.down{left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom));animation:pfeilWippen 1.3s ease-in-out infinite}
+.inst-arrow.up{right:18px;top:calc(10px + env(safe-area-inset-top));align-items:flex-end;gap:2px}
+.inst-arrow.up svg{width:38px;height:38px}
+@keyframes pfeilWippen{0%,100%{transform:translateY(0)}50%{transform:translateY(10px)}}
+@media (prefers-reduced-motion:reduce){.inst-arrow.down{animation:none}}
+.acc-link[hidden]{display:none}
 
 /* Backup-Erinnerung (Hinweis-Leiste auf dem Dashboard) */
 .reminder{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--cat-y) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--cat-y) 45%,var(--border));border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:14px}

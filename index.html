@@ -452,6 +452,12 @@
       <span class="acc-txt"><span class="acc-t">Anleitung</span><span class="acc-s">10 Themen</span></span>
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
     </button>
+    <!-- App installieren: nur im Handy-Browser sichtbar (initInstall), öffnet den Installations-Assistenten -->
+    <button class="acc-head acc-link" id="mInstall" type="button" hidden>
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM12 7v7M9 11l3 3 3-3"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">App installieren</span><span class="acc-s">Auf den Home-Bildschirm</span></span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
   </div>
   <div class="dlg-actions menu-actions"><button class="btn-fill menu-close" id="menuClose" type="button">Menü schließen</button></div>
 </dialog>
@@ -622,6 +628,15 @@
     <button class="btn-text" id="confirmCancel" type="button">Abbrechen</button>
     <button class="btn-fill" id="confirmOk" type="button">OK</button>
   </div>
+</dialog>
+
+<!-- Installations-Assistent bzw. Import-Angebot beim ersten Start der installierten App (Inhalt: instRender) -->
+<dialog id="instDlg" aria-labelledby="instTitle">
+  <div class="inst-card" id="instCard"></div>
+  <div class="inst-arrow down" id="instArrowDown" hidden aria-hidden="true"><span>Safari-Leiste</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M6 14l6 6 6-6"/></svg></div>
+  <div class="inst-arrow up" id="instArrowUp" hidden aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V4"/><path d="M6 10l6-6 6 6"/></svg><span>Browser-Menü</span></div>
 </dialog>
 
 <input type="file" id="importFile" accept="application/json,.json,text/plain,.txt" style="display:none">

@@ -2177,6 +2177,150 @@ function injectPWA(){
 }
 
 /* ---------- Start ---------- */
+/* ==================== INSTALLATIONS-ASSISTENT ====================
+   Entwürfe AssistentIphone/AssistentSafari/AssistentAndroid/AssistentAndroidMenue/AssistentImport.
+   Erscheint beim Start im Handy-Browser (nicht in der installierten App, nicht am PC). Die App dahinter
+   ist gesperrt (modales Fenster → alles andere „inert"). „Später" schließt, beim nächsten Start kommt er
+   wieder; im Menü öffnet „App installieren" ihn erneut.
+   iPhone: Weg über die Teilen-Taste von Safari (ob navigator.share dort „Zum Home-Bildschirm" anbietet,
+   ist UNBESTÄTIGT – deshalb nicht genutzt). Die App erfährt nicht, ob installiert wurde → „Erledigt".
+   Android/Chrome: echter Installations-Dialog über beforeinstallprompt; fehlt das Ereignis, Weg übers
+   Browser-Menü. Erster Start in der installierten App ohne Werte: Angebot, ein Backup einzulesen. */
+const UA=navigator.userAgent||'';
+const IS_IOS=/iPhone|iPad|iPod/.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_IPHONE=/iPhone|iPod/.test(UA);
+const IS_ANDROID=/Android/i.test(UA);
+// Safari erkennen: andere iOS-Browser und In-App-Browser (Facebook, Instagram, Google-App …) zählen nicht.
+const IS_IOS_SAFARI=IS_IOS&&/Safari\//.test(UA)&&!/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|YaBrowser|FBAN|FBAV|Instagram|Line\//.test(UA);
+function isStandalone(){ return navigator.standalone===true||!!(window.matchMedia&&matchMedia('(display-mode: standalone)').matches); }
+const installApplies=()=>(IS_IOS||IS_ANDROID)&&!isStandalone();
+let _bip=null;   // gemerktes beforeinstallprompt-Ereignis (Chrome/Android) für den echten Installations-Dialog
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); _bip=e; });
+window.addEventListener('appinstalled',()=>{ _bip=null; if($('#instDlg').open){ inst.kind='androidDone'; instRender(); } });
+const IMPORT_FLAG='bpp_import_offered';   // geräte-interner Merker: Import-Angebot schon gezeigt (nicht im Backup)
+const importOffered=()=>{ try{ return localStorage.getItem(IMPORT_FLAG)==='1'; }catch{ return false; } };
+const markImportOffered=()=>{ try{ localStorage.setItem(IMPORT_FLAG,'1'); }catch{} };
+
+const inst={kind:'',step:0};
+const I_SHARE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+const I_CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const I_ADD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>';
+function instHead(label,dots){
+  const d=dots==null?'':'<div class="inst-dots" aria-hidden="true">'+[1,2,3].map(n=>'<span'+(dots>=n?' class="on"':'')+'></span>').join('')+'</div>';
+  return '<div class="inst-head"><span class="inst-lbl">'+label+'</span>'+d+'</div>';
+}
+const instT=t=>'<h2 class="inst-t" id="instTitle">'+t+'</h2>';
+const instP=t=>'<p class="inst-p">'+t+'</p>';
+const instDone=()=>'<span class="inst-ok" aria-hidden="true">'+I_CHECK+'</span>';
+const instNum=items=>'<ol class="inst-box inst-num">'+items.map((t,i)=>'<li><span>'+(i+1)+'</span>'+t+'</li>').join('')+'</ol>';
+function instBtns(main,sec,hl){
+  return '<div class="inst-btns">'+
+    (main?'<button type="button" class="inst-main'+(hl?' hl':'')+'" data-act="'+main[1]+'">'+(main[2]||'')+main[0]+'</button>':'')+
+    (sec?'<button type="button" class="inst-sec" data-act="'+sec[1]+'">'+sec[0]+'</button>':'')+'</div>';
+}
+function instCardHTML(){
+  const k=inst.kind, s=inst.step;
+  if(k==='ios'){
+    if(s===0) return instHead('App installieren',0)+instT('Mach Blutdruck Pro zu deiner App')+
+      instP('Mit einem Symbol auf dem Home-Bildschirm startet sie wie eine richtige App und funktioniert auch ohne Internet. Das dauert etwa eine Minute.')+
+      instBtns(['Los geht’s','next'],['Später','later']);
+    if(s===1) return instHead('Schritt 1 von 3',1)+instT('Tippe in Safari auf das Teilen-Symbol')+
+      '<div class="inst-box inst-share"><span class="inst-key on">'+I_SHARE+'</span><span class="inst-or">oder erst</span><span class="inst-key">···</span></div>'+
+      instP('Ein Viereck mit einem Pfeil nach oben, in der Leiste von Safari. Je nach iOS-Version liegt es direkt dort oder hinter den drei Punkten.')+
+      instBtns(['Weiter','next'],['Zurück','back']);
+    if(s===2) return instHead('Schritt 2 von 3',2)+instT('Wähle „Zum Home-Bildschirm“')+
+      '<div class="inst-box inst-list"><div>Kopieren</div><div>Lesezeichen hinzufügen</div><div class="on">Zum Home-Bildschirm'+I_ADD+'</div></div>'+
+      instP('Siehst du es nicht gleich? Dann scrolle in der Liste nach unten. Das Menü kann auf deinem iPhone etwas anders aussehen.')+
+      instBtns(['Weiter','next'],['Zurück','back']);
+    if(s===3) return instHead('Schritt 3 von 3',3)+instT('Tippe auf „Hinzufügen“')+
+      '<div class="inst-box inst-add"><div class="inst-add-bar"><span>Abbrechen</span><span class="on">Hinzufügen</span></div>'+
+      '<div class="inst-add-app"><span class="inst-icon">'+SVG_ICON+'</span><span><b>Blutdruck Pro</b><small>Name kannst du so lassen</small></span></div></div>'+
+      instP('Falls dort ein Schalter wie „Als Web-App öffnen“ steht, lass ihn eingeschaltet.')+
+      instBtns(['Erledigt','next'],['Zurück','back']);
+    return instHead('Fertig',3)+instDone()+instT('Fast geschafft')+
+      instP('Öffne die App jetzt über das neue Symbol auf deinem Home-Bildschirm. Diese Seite in Safari brauchst du danach nicht mehr.')+
+      instBtns(['Noch einmal zeigen','again'],['Schließen','close']);
+  }
+  if(k==='iosOther') return instHead('App installieren')+instT('Öffne diese Seite bitte in Safari')+
+    instP('Du bist gerade in einem anderen Browser oder in einer anderen App. Am einfachsten klappt die Installation in Safari: Link kopieren, Safari öffnen und oben einfügen.')+
+    '<div class="inst-box inst-url" id="instUrl">'+escapeHtml(appUrl().replace(/^https?:\/\//,''))+'</div>'+
+    instBtns(['Link kopieren','copy'],['Später','later'],true);
+  if(k==='android') return instHead('App installieren')+instT('Mach Blutdruck Pro zu deiner App')+
+    instP('Mit einem Tipp liegt sie als Symbol auf deinem Startbildschirm und funktioniert auch ohne Internet.')+
+    instBtns(['Installieren','install'],['Später','later'],true);
+  if(k==='androidMenu') return instHead('App installieren')+instT('So geht es über das Browser-Menü')+
+    instNum(['Tippe oben rechts auf die drei Punkte','Wähle „App installieren“ oder „Zum Startbildschirm hinzufügen“','Bestätige und öffne die App über das neue Symbol'])+
+    instP('Am einfachsten klappt es in Chrome. In anderen Browsern können die Bezeichnungen abweichen.')+
+    instBtns(['Erledigt','menuDone'],['Später','later']);
+  if(k==='androidMenuDone') return instHead('Fertig')+instDone()+instT('Fast geschafft')+
+    instP('Öffne die App jetzt über das neue Symbol auf deinem Startbildschirm. Diese Seite im Browser brauchst du danach nicht mehr.')+
+    instBtns(['Noch einmal zeigen','againMenu'],['Schließen','close']);
+  if(k==='androidDone') return instHead('Fertig')+instDone()+instT('Installiert')+
+    instP('Öffne die App jetzt über das neue Symbol auf deinem Startbildschirm.')+
+    instBtns(null,['Schließen','close']);
+  /* import */ return '<span class="inst-icon big">'+SVG_ICON+'</span>'+instT('Hast du schon Werte?')+
+    instP('Aus einer Backup-Datei kannst du sie jetzt übernehmen, auch aus der alten Blutdruck-App. Du kannst das später jederzeit im Menü unter „Backup“ nachholen.')+
+    instBtns(['Backup-Datei auswählen','pick'],['Ohne Werte starten','skip']);
+}
+const appUrl=()=>location.origin+location.pathname;
+function instRender(){
+  const d=$('#instDlg'), k=inst.kind;
+  $('#instCard').innerHTML=instCardHTML();
+  d.classList.toggle('center',k==='import');
+  d.classList.toggle('arrow-top',k==='androidMenu');
+  $('#instArrowDown').hidden=!(k==='ios'&&inst.step===1&&IS_IPHONE);   // Pfeil zur Safari-Leiste (nur iPhone; iPad hat sie oben)
+  $('#instArrowUp').hidden=k!=='androidMenu';
+  const main=d.querySelector('.inst-main')||d.querySelector('.inst-sec');
+  if(main) main.focus({preventScroll:true});
+  d.scrollTop=0;
+}
+function instOpen(kind){
+  inst.kind=kind||(IS_IOS?(IS_IOS_SAFARI?'ios':'iosOther'):'android'); inst.step=0;
+  const d=$('#instDlg'); if(!d.open) d.showModal();
+  instRender();
+}
+async function instInstall(){
+  const p=_bip;
+  if(!p){ inst.kind='androidMenu'; instRender(); return; }   // kein Ereignis (anderer Browser o. Ä.) → Browser-Menü
+  _bip=null;                                                 // ein Ereignis lässt sich nur einmal nutzen
+  try{
+    p.prompt();
+    const c=await p.userChoice;
+    if(c&&c.outcome==='accepted'){ inst.kind='androidDone'; instRender(); }
+  }catch{ inst.kind='androidMenu'; instRender(); }
+}
+async function instCopy(){
+  try{ await navigator.clipboard.writeText(appUrl()); toast('Link kopiert'); }
+  catch{   // ohne Zwischenablage-Recht: Link markieren, damit man ihn selbst kopieren kann
+    const r=document.createRange(); r.selectNodeContents($('#instUrl'));
+    const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    toast('Bitte den markierten Link kopieren','notice');
+  }
+}
+$('#instDlg').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const a=b.dataset.act, d=$('#instDlg');
+  if(a==='next'){ inst.step++; instRender(); }
+  else if(a==='back'){ inst.step=Math.max(0,inst.step-1); instRender(); }
+  else if(a==='again'){ inst.step=1; instRender(); }
+  else if(a==='againMenu'){ inst.kind='androidMenu'; instRender(); }
+  else if(a==='menuDone'){ inst.kind='androidMenuDone'; instRender(); }
+  else if(a==='install') instInstall();
+  else if(a==='copy') instCopy();
+  else if(a==='pick'){ markImportOffered(); d.close(); $('#importFile').click(); }
+  else if(a==='skip'){ markImportOffered(); d.close(); }
+  else d.close();   // later / close
+});
+// Esc bzw. Android-Zurück: wie „Später" (beim Import-Angebot wie „Ohne Werte starten").
+$('#instDlg').addEventListener('cancel',()=>{ if(inst.kind==='import') markImportOffered(); });
+$('#mInstall').addEventListener('click',()=>{ $('#menuDlg').close(); instOpen(); });
+function initInstall(){
+  const m=$('#mInstall'); m.hidden=!installApplies();
+  m.querySelector('.acc-s').textContent=IS_IOS?'Auf den Home-Bildschirm':'Auf den Startbildschirm';
+  if(installApplies()) instOpen();
+  else if(isStandalone()&&!totalCount()&&!importOffered()) instOpen('import');
+}
+
 async function init(){
   injectPWA(); applyTheme(); applySettingsUI();
   await requestPersistence();          // Speicher dauerhaft anfordern
@@ -2185,6 +2329,7 @@ async function init(){
   updateReminder(); setNavH();
   history.replaceState({d:1},'');   // Basis-Eintrag (Dashboard) markieren – Zurück an der Wurzel verlässt die App
   showTab('dashboard');             // Verlauf rendert beim ersten Öffnen (showTab → renderTable)
+  initInstall();                    // Installations-Assistent (Handy-Browser) bzw. Import-Angebot (erster Start der App)
 
 }
 init();
