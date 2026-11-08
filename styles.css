@@ -466,6 +466,8 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 .dlm-val+.dword{margin-top:-6px}
 .dlm-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .dlm-none{opacity:.75}
+/* Gewicht: eine Karte über die ganze Breite, Name links, Zahl rechts (keine Ampel darunter) */
+.dlm-wide{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
 /* Letzte 7 Tage */
 .dst{display:flex;flex-direction:column;padding:0}
 .dst-top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px 12px}
@@ -488,6 +490,8 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 #dashboard>*:nth-child(5){animation-delay:.16s}
 #dashboard>*:nth-child(6){animation-delay:.2s}
 #dashboard>*:nth-child(7){animation-delay:.24s}
+#dashboard>*:nth-child(8){animation-delay:.28s}
+#dashboard>*:nth-child(9){animation-delay:.32s}
 @media (prefers-reduced-motion:reduce){#dashboard>*{animation:none}}
 
 /* ================= Erfassen (geführte Eingabe) =================
@@ -572,16 +576,17 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;color:inherit;text-align:center}
 .cap-tile-box{display:block}
 .cap-tile-seg,.cap-tile-val{display:block}
-/* Durchgang C (5 Felder): schmalere Kacheln, Ampel nur als Kachelfarbe (keine Pille darüber) */
+/* Durchgang C (6 Felder): schmalere Kacheln, Ampel nur als Kachelfarbe (keine Pille darüber).
+   Die Zahl wächst mit der Bildschirmbreite, damit auch „102,5" in die sechste Kachel passt. */
 .cap-seg.compact .cap-seg-inner{gap:6px}
 .cap-seg.compact .cap-tile-pill{display:none}
 .cap-seg.compact .cap-ink{top:0}
 .cap-seg.compact .cap-tile-box{padding:9px 2px}
-.cap-seg.compact .cap-tile-val{font-size:17px}
-/* Variante B: Umschalter Blutdruck · Temperatur · Sauerstoff */
+.cap-seg.compact .cap-tile-val{font-size:clamp(12.5px,4vw,17px);letter-spacing:-.02em}
+/* Variante B: Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht */
 .cap-switch{position:relative;flex:none;display:flex;gap:4px;margin:8px 16px 0;padding:4px;border-radius:999px;background:var(--surf2)}
-.cap-switch-ink{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 16px)/3);border-radius:999px;background:var(--accent);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
-.cap-switch button{position:relative;flex:1;min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:color .2s ease}
+.cap-switch-ink{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 20px)/4);border-radius:999px;background:var(--accent);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.cap-switch button{position:relative;flex:1 1 0;min-width:0;min-height:44px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:clamp(11px,3.3vw,13px);font-weight:800;white-space:nowrap;transition:color .2s ease}
 .cap-switch button.active{color:var(--accent-ink)}
 @media (prefers-reduced-motion:reduce){.cap-switch-ink,.metric-seg-ink{transition:none}}
 /* Ampel des aktuellen Felds unter der Zahl; über 100 % rot */
@@ -705,10 +710,10 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .vh-c-p{width:46px;text-align:right}
 .vh-c-chev{width:20px}
 
-/* ---- Umschalter Blutdruck · Temperatur · Sauerstoff (Verlauf + Diagramm) ---- */
+/* ---- Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht (Verlauf + Diagramm) ---- */
 .metric-seg{position:relative;flex:none;display:flex;gap:4px;margin:2px 16px 6px;padding:3px;border-radius:999px;background:var(--surf2);border:1px solid var(--line)}
-.metric-seg-ink{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 14px)/3);border-radius:999px;background:var(--surf);box-shadow:0 1px 3px rgba(20,30,50,.14);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
-.metric-seg button{position:relative;flex:1;min-height:40px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:color .2s ease}
+.metric-seg-ink{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 18px)/4);border-radius:999px;background:var(--surf);box-shadow:0 1px 3px rgba(20,30,50,.14);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.metric-seg button{position:relative;flex:1 1 0;min-width:0;min-height:40px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:clamp(11px,3.3vw,13px);font-weight:800;white-space:nowrap;transition:color .2s ease}
 .metric-seg button.active{color:var(--accent)}
 /* Wischen (Erfassen Variante B, Verlauf, Diagramm; app.js, swipePager): .swipe-stage gleitet, die Kopie der alten Seite
    liegt währenddessen an derselben Stelle und spielt ihre Einblend-Animationen nicht erneut ab. */
@@ -762,6 +767,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 /* ---- Detail (Einzelmessung) ---- */
 .det-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 18px 16px;display:flex;flex-direction:column;gap:12px}
 .det-hero{display:flex;flex-direction:column;gap:9px;align-items:center;text-align:center;padding-top:4px}
+.det-hero.no-amp{padding-top:22px}   /* Gewicht: ohne Ampel-Pille rückt die Zahl sonst an den Bildschirmrand */
 .det-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;font-size:13px;font-weight:700;padding:6px 14px}
 .det-pill .d{width:7px;height:7px;border-radius:50%}
 .det-nums{display:flex;align-items:flex-end;gap:6px;justify-content:center}
@@ -853,7 +859,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .dg-legend .avg{display:inline-flex;align-items:center;gap:5px}
 .dg-legend .avg i{width:15px;height:0;border-top:2px dashed;display:inline-block}
 .dg-legend .cnts{display:inline-flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
-/* Temperatur/Sauerstoff: nur der Zeitraum in der Steuerleiste (Sys/Dia/Beide/Puls ausgeblendet) */
+/* Temperatur/Sauerstoff/Gewicht: nur der Zeitraum in der Steuerleiste (Sys/Dia/Beide/Puls ausgeblendet) */
 .dg-range-lbl{display:none}
 .dg-controls.only-range .dg-seg,.dg-controls.only-range .dg-pulse{display:none}
 .dg-controls.only-range .dg-range-lbl{display:block;flex:1;font-size:12.5px;font-weight:700;color:var(--muted)}
@@ -978,7 +984,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
   #reportPrint .rp-page:not(.rp-page-land){display:block!important}
   #reportPrint .rp-tabletile{overflow:visible!important}
   #reportPrint .rp-blk,#reportPrint .rp-trow{break-inside:avoid}
-  #reportPrint .rp-page+.rp-page{break-before:page}   /* jede Seite (auch „Temperatur & Sauerstoff") auf ein neues Blatt */
+  #reportPrint .rp-page+.rp-page{break-before:page}   /* jede Seite (auch Temperatur/Sauerstoff/Gewicht) auf ein neues Blatt */
 }
 @media (prefers-reduced-motion:reduce){
   #tab-report.screen.active{animation:none}

@@ -1,17 +1,17 @@
 # Blutdruck Pro – Projektkontext für Claude
 
-Eine kleine PWA zum Erfassen von **Blutdruck und Puls, Körpertemperatur und Sauerstoffsättigung (SpO₂)**.
+Eine kleine PWA zum Erfassen von **Blutdruck und Puls, Körpertemperatur, Sauerstoffsättigung (SpO₂) und Körpergewicht**.
 Weiterentwicklung der alten App [izblu/Blutdruck](https://github.com/izblu/Blutdruck) im eigenen Repo
 **izblu/Blutdruck-Pro**, live unter https://izblu.github.io/Blutdruck-Pro/ (GitHub Pages). **Jeder Push ist kurz
 darauf live.** Hauptgerät ist das **iPhone**, Android muss weiter funktionieren.
 
 Aufgeteilt in [index.html](index.html) (HTML-Struktur), [styles.css](styles.css) (Gestaltung/CSS),
-[vitals.js](vitals.js) (Grundlagen für Temperatur & Sauerstoff) und [app.js](app.js) (Logik/JavaScript), dazu
+[vitals.js](vitals.js) (Grundlagen für Temperatur, Sauerstoff & Gewicht) und [app.js](app.js) (Logik/JavaScript), dazu
 [sw.js](sw.js) (Offline) und [manifest.webmanifest](manifest.webmanifest) (Installation). **Kein Build, kein
 Framework, keine Abhängigkeiten, kein Server.**
 
 Fachliche Regeln stehen in eigenen Spezifikationen:
-[vitalwerte-spezifikation.md](vitalwerte-spezifikation.md) (Temperatur & Sauerstoff, Ziffern-Logik, großes +),
+[vitalwerte-spezifikation.md](vitalwerte-spezifikation.md) (Temperatur, Sauerstoff & Gewicht, Ziffern-Logik, großes +),
 [dashboard-spezifikation.md](dashboard-spezifikation.md) und
 [arzt-report-spezifikation.md](arzt-report-spezifikation.md).
 
@@ -69,21 +69,23 @@ nebeneinander laufen, ohne sich Daten zu teilen. Werte wandern nur per Backup-Da
 der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro lädt seine Dateien dann online neu.
 
 ### Code-Struktur
-- `index.html` (~660 Z.), `styles.css` (~955 Z.), `vitals.js` (~215 Z.), `app.js` (~2535 Z.), `sw.js`.
+- `index.html` (~680 Z.), `styles.css` (~990 Z.), `vitals.js` (~230 Z.), `app.js` (~2660 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v12`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v13`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 
-### Temperatur & Sauerstoff (`vitals.js`, Details in der Vitalwerte-Spezifikation)
+### Temperatur, Sauerstoff & Gewicht (`vitals.js`, Details in der Vitalwerte-Spezifikation)
 - **Eigene Liste `vitals`**, getrennt von den Blutdruck-Einträgen `entries` (so bleibt ein Pro-Backup für die alte
-  App lesbar). Ein Datensatz, ein Wert: `{id, ts, type:'temp'|'spo2', value, note}`, `value` immer als Zahl.
+  App lesbar). Ein Datensatz, ein Wert: `{id, ts, type:'temp'|'spo2'|'weight', value, note}`, `value` immer als Zahl.
   Eigener Bereich der Browser-Datenbank (IndexedDB-Store `vitals`, `DB_VER` 2) plus `localStorage`-Kopie.
 - `vitals.js` enthält nur Definitionen: `METRICS` (Name, Einheit, Nachkommastellen, Plausibel-Bereich),
   `VITAL_THR_DEFAULT`, `catMetric(type,v)` (Ampel **mit** Wort, weil Gelb bei der Temperatur zwei Bedeutungen hat),
   `fmtMetric`/`meanMetric`, Ziffern-Logik (`CAP_DEF`, `digitTarget`, `rawComplete`, `capFieldCat`, `capFieldOdd`),
   Speicher (`addVital`/`updateVital`/`removeVital`/`normVital`), Zählen (`totalCount`, `countParts`) und die
   zeitgetreue Grafik (`buildMetricChart`, `metricScale`).
+- **Gewicht** (kg, eine Nachkommastelle) hat **keine Ampel** (`hasAmpel`, wie der Puls): nur die Zahl in `--ink`, kein Punkt, kein
+  Wort, kein Zielbereich; Schriftfarbe über `metricInk`. Nicht dabei: Zielgewicht, BMI, Pfund, Trend, Körpergröße.
 - **Ampel:** Temperatur Niedrig · Normal · Erhöht · Fieber, Sauerstoff Zu niedrig · Niedrig · Im Ziel. Grenzen in
   `settings.thr` (`tempLow`, `tempY`, `tempR`, `spo2Y`, `spo2G`) zusätzlich zu `sysY/sysR/diaY/diaR`. Die
   Standardwerte sind gängige Richtwerte, die **Fieber-Grenzen sind nicht gegen eine Leitlinie bestätigt**.
@@ -111,16 +113,17 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 ### Großes + und Erfassen (`#tab-capture`)
 - **Das große + hat drei wählbare Wege** (`settings.plusMode`, Standard **`'c'`**, kommt ins Backup), gewählt unter
   Menü → Anzeige → „Neue Messung (Plus-Button)". `openPlus()` verzweigt:
-  - **A „Erst wählen"**: Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff.
-  - **B „Direkt starten"**: Blutdruck, oben ein Umschalter zu Temperatur/Sauerstoff, zusätzlich per Wischen.
-  - **C „Alles nacheinander"**: Sys → Dia → Puls → Temperatur → Sauerstoff; Fehlendes wird übersprungen. Jeder Wert
+  - **A „Erst wählen"**: Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff · Gewicht.
+  - **B „Direkt starten"**: Blutdruck, oben ein Umschalter zu Temperatur/Sauerstoff/Gewicht, zusätzlich per Wischen.
+  - **C „Alles nacheinander"**: Sys → Dia → Puls → Temperatur → Sauerstoff → Gewicht; Fehlendes wird übersprungen. Jeder Wert
     wird ein eigener Datensatz mit gleichem `ts`, die Notiz wird in alle kopiert. Puls lässt sich überspringen
     (`pulse:null`, alle Puls-Stellen kommen damit klar).
 - **Geführte Eingabe** mit eigenem Ziffernblock, großer Vorschauzahl, Segment-Kacheln mit Ampel, Datum/Uhrzeit- und
   Notiz-Blatt, Speichern-Häkchen. Feldliste je Art über `CAP_MODES`, Einstieg `startCapture({mode|entry|vital,
   switcher},returnTab)`. Bearbeiten öffnet nur die Felder des einen Datensatzes; der Typ bleibt.
 - **Ziffern-Logik:** erkennt 2 oder 3 Stellen selbst (Sys mit 1/2 am Anfang dreistellig, Dia/Puls/SpO₂ mit 1,
-  Temperatur immer drei Ziffern, das Komma setzt die App: `368` → 36,8), 0 am Anfang wird ignoriert, vollständig →
+  Temperatur immer drei Ziffern, das Komma setzt die App: `368` → 36,8; Gewicht drei Ziffern, mit 1/2 am Anfang vier: `825` → 82,5,
+  `1025` → 102,5), 0 am Anfang wird ignoriert, vollständig →
   automatisch weiter. Ampel erst bei vollständigem Wert.
 - **Notiz-Feld** (`#capNoteBtn`, Aussehen eines Eingabefelds) über die ganze Breite direkt über dem Ziffernblock, zeigt
   eine vorhandene Notiz einzeilig an und öffnet das Notiz-Blatt. Bleibt beim Wischen stehen. Das Notiz-Blatt steht dank
@@ -140,8 +143,9 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   von Meldungen (`swipeToast`, folgt ebenfalls dem Finger).
 
 ### Dashboard (`renderDashboard`, Startseite)
-„Letzte Messung + 7 Tage", alle vier Werte im selben Aufbau ([dashboard-spezifikation.md](dashboard-spezifikation.md)):
-- **Letzte Messung:** Karten Blutdruck + Puls · Temperatur · Sauerstoff, Zahl in Ampelfarbe mit Ampel-Punkt und
+„Letzte Messung + 7 Tage", alle Werte im selben Aufbau ([dashboard-spezifikation.md](dashboard-spezifikation.md)):
+- **Letzte Messung:** Karten Blutdruck + Puls · Temperatur · Sauerstoff, darunter Gewicht über die ganze Breite (`.dlm-wide`,
+  ohne Ampel), Zahl in Ampelfarbe mit Ampel-Punkt und
   Ampel-Wort, Zeitpunkt relativ („vor 2 Std.", `relTime`). Antippen → Detail.
 - **Letzte 7 Tage** (rollierend, fest): je Wert nur der **Ø in Ampelfarbe + Wort** (Puls ohne Ampel), **erst ab 3
   Messungen** (`DASH_MIN`), sonst „Zu wenige Messungen" bzw. „Keine Messung in den letzten 7 Tagen". Antippen →
@@ -152,7 +156,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   Komma über `fmtMetric`), Karten blenden gestaffelt ein. Alles hinter `prefers-reduced-motion`.
 
 ### Verlauf, Detail und Diagramm
-- **Umschalter** Blutdruck · Temperatur · Sauerstoff (`.metric-seg` oder Wischen, Zustand `viewMetric`, flüchtig) und
+- **Umschalter** Blutdruck · Temperatur · Sauerstoff · Gewicht (`.metric-seg` oder Wischen, Zustand `viewMetric`, flüchtig) und
   **gemeinsamer Zeitraum** 7/30/90 + Von–Bis (`applyVerlaufRange`, `filters.from/to`) gelten für Verlauf **und**
   Diagramm.
 - **Verlauf** (`renderTable`, Screen-Id bleibt `#tab-table`): neueste zuerst, Werte in Ampelfarbe (Blutdruck per Wert
@@ -162,7 +166,8 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 - **Diagramm Blutdruck** (`renderChart`/`buildDiagChart`, SVG): Sys/Dia/Beide + Puls-Umschalter, Ampel-Farbpunkte,
   gestrichelte Ø-Linie, keine Schwellen-Linien. Der Puls-Umschalter baut nur die Puls-Ebene ein/aus
   (`setDiagPulseLayer`/`diagPulseLayer`), Sys/Dia spielen ihre Animation nicht erneut ab.
-- **Diagramm Temperatur/Sauerstoff** (`renderMetricChart`/`buildMetricChart`): eigene Grafik mit **zeitgetreuer
+- **Diagramm Temperatur/Sauerstoff/Gewicht** (`renderMetricChart`/`buildMetricChart`; Gewicht mit Punkten in Akzentfarbe, ohne
+  Ampel-Wort und Zählung): eigene Grafik mit **zeitgetreuer
   Achse**, Ampel-Punkte (`catMetric`), Ø-Linie, Mindest-Spanne der Höhenachse; Sys/Dia/Puls-Knöpfe ausgeblendet.
 - **Ampel Blutdruck:** `catVal(v,y,r)` je Wert, `category(e)` = schlechterer von Sys/Dia.
 
@@ -189,7 +194,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   nutzen den Öffnen-Dialog und **führen** den Datei-Inhalt mit den App-Daten **zusammen**, bevor verknüpft und
   zurückgeschrieben wird. Danach schreibt jede Änderung automatisch (`scheduleAutoBackup`/`autoBackupIfLinked`).
   **Android-Warnung** (gelb, immer wenn `FS_SUPPORTED`): diese Datei nie zusätzlich in der alten App verknüpfen,
-  die würde sie ohne Temperatur und Sauerstoff überschreiben.
+  die würde sie ohne Temperatur, Sauerstoff und Gewicht überschreiben.
 - **Karte „Manuelles Backup":** „Speichern" (Download) / „Wiederherstellen" (.txt oder ältere .json, Statistik
   „X neu, Y aktualisiert"; Merge-Kern `mergeEntriesFromData`, geteilt mit „Auswählen").
 - **Hinweis** (Info-Symbol): Backups liegen auf diesem Handy, sicher erst an einem zweiten Ort. Darunter breiter Knopf
@@ -206,7 +211,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 
 ### Daten (Menü-Abschnitt)
 - „Als CSV exportieren (Excel)": Spalten `Datum; Uhrzeit; Systolisch; Diastolisch; Puls; Temperatur (°C); SpO2 (%);
-  Notiz`, Dezimalkomma. Darunter `#csvNote` mit der Anzahl je Wert („42 Blutdruck · 7 Temperatur · 7 Sauerstoff").
+  Gewicht (kg); Notiz`, Dezimalkomma. Darunter `#csvNote` mit der Anzahl je Wert („42 Blutdruck · 7 Temperatur · 7 Sauerstoff · 5 Gewicht").
 - „Arzt-Report (Drucken/PDF)" (`#mReport`).
 - „Alle Daten löschen" löscht `entries` **und** `vitals`; die Rückfrage zählt alle Werte je Art, Pflicht-Häkchen,
   Hinweis, dass eine Backup-Datei erhalten bleibt.
@@ -235,12 +240,12 @@ enthält die Android-Warnung. Unten „‹ Zurück" (ins Menü) und „Menü sch
 Aufbereiteter, **druckbarer** A4-Bericht für den Arztbesuch. **Reine Datenaufbereitung, keine Diagnose/Bewertung.**
 Einstiege: Icon im Diagramm-Kopf (`#rpOpenChart`) und Menü → Daten (`#mReport`), beide `openReport()`.
 - **Report-Menü** (Vollbild-Screen `#tab-report`): Zeitraum 30/90/Eigener, Report-Farbe (5 Swatches), Schalter
-  **Namensfeld**, **Puls einbeziehen**, **Temperatur & Sauerstoff einbeziehen** (Standard an) und
+  **Namensfeld**, **Puls einbeziehen**, **Temperatur & Sauerstoff einbeziehen**, **Gewicht einbeziehen** (beide Standard an) und
   **Anhangseite(n) drucken**, verkleinerte Live-Vorschau, Knöpfe **„Drucken"** und **„Als Datei teilen"**. Das Menü
   folgt dem App-Theme, die A4-Seiten sind **immer hell**.
-- **Seiten:** Seite 1 „Kompakt" Blutdruck (`rpPage`) · Seite 2 „Temperatur & Sauerstoff" (`rpVitalPage`, entfällt
-  ohne Werte im Zeitraum) · Anhang Blutdruck im Querformat (`rpLandscape`) · Anhang Temperatur & Sauerstoff im
-  Querformat (`rpVitalLandscape`, beide Werte auf einer Seite, gemeinsame Datumsachse). Reihenfolge über `rpPages`.
+- **Seiten:** Seite 1 „Kompakt" Blutdruck (`rpPage`) · Seite 2 Temperatur, Sauerstoff & Gewicht (`rpVitalPage`, Titel nach Inhalt, entfällt
+  ohne Werte im Zeitraum) · Anhang Blutdruck im Querformat (`rpLandscape`) · Anhang Temperatur, Sauerstoff & Gewicht im
+  Querformat (`rpVitalLandscape`, alle Werte auf einer Seite in bis zu drei Bändern, gemeinsame Datumsachse). Reihenfolge über `rpPages`.
 - **Technik:** `reportData`/`reportVitals` bündeln die Kennzahlen aus vorhandener Logik, eigener Bereichsfilter
   (nicht `filters`). Feste helle Palette `RP`, eigene Grafiken (`rpChart`, `rpMetricChart`, `rpVitalChartDetail`).
   `reportState` ist **bewusst flüchtig** (bei jedem Öffnen Standard, nichts in `settings`/Backup). Druck über
@@ -296,7 +301,7 @@ Einstiege: Icon im Diagramm-Kopf (`#rpOpenChart`) und Menü → Daten (`#mReport
 
 ## Geparkte Aufgaben
 
-Stand 2026-11-08: Der Umbau „Temperatur & Sauerstoff" (Schritte 1–10) ist fertig, inklusive neuem Dashboard, Menü,
+Stand 2026-11-08: Der Umbau „Temperatur & Sauerstoff" (Schritte 1–10) und das Körpergewicht als vierter Messwert sind fertig, inklusive neuem Dashboard, Menü,
 Anleitung, Icon, Installations-Assistent, Arzt-Report-Seiten und iPhone-Feinschliff.
 *Legende — Aufwand: klein / mittel / groß · Machbarkeit: problemlos / mit Hürde / heikel.*
 
@@ -342,13 +347,13 @@ Anleitung, Icon, Installations-Assistent, Arzt-Report-Seiten und iPhone-Feinschl
 ### 4. Zurückgestellt (niedrige Priorität)
 - **JS in Module aufteilen** (`storage.js`/`backup.js`/`chart.js`/`ui.js`, `<script type="module">`) — mittel ·
   problemlos, aber Sorgfalt wegen vieler gegenseitiger Abhängigkeiten (Backup/Auto-Backup, Einstellungen/Theme).
-  `vitals.js` ist schon ausgelagert; `app.js` hat inzwischen ~2535 Zeilen. Kein `file://`-Problem, weil die PWA
+  `vitals.js` ist schon ausgelagert; `app.js` hat inzwischen ~2660 Zeilen. Kein `file://`-Problem, weil die PWA
   ohnehin http(s)/localhost braucht; `sw.js` müsste um die neuen Dateien ergänzt werden. Zurückstellen, bis `app.js`
   spürbar unhandlich wird oder größere Eingriffe an Speicher/Backup anstehen.
 
 ### 5. Bewusst nicht enthalten / gestrichen
 - **Bewusst nicht enthalten:** Messort bei der Temperatur · Puls beim Sauerstoff · Apple Health und Bluetooth (auf dem
-  iPhone nur mit nativer App) · Fahrenheit · gemeinsames Diagramm aller Werte.
+  iPhone nur mit nativer App) · Fahrenheit · gemeinsames Diagramm aller Werte · beim Gewicht Zielgewicht, BMI, Körpergröße, Pfund, Trend.
 - **CSV-Import** — redundant zu „Backup → Wiederherstellen"; CSV hat keine `id` → Dubletten, fehleranfälliges
   Datums-Parsen. (CSV-**Export** bleibt.)
 - **Personalisierung (Alter/Fitness → Zielwerte)** — der Zielbereich-Editor (`settings.thr`) deckt den Bedarf ab;

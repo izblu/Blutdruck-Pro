@@ -264,13 +264,15 @@ const CAT_INK ={g:'var(--g-ink)', y:'var(--y-ink)', r:'var(--r-ink)', n:'var(--m
 const CAT_SOFT={g:'var(--g-soft)',y:'var(--y-soft)',r:'var(--r-soft)',n:'var(--surf2)'};
 const CAT_BAR ={g:'var(--g-bar)', y:'var(--y-bar)', r:'var(--r-bar)', n:'var(--muted)'};
 const CAT_LABEL={g:'Im Ziel', y:'Erhöht', r:'Zu hoch', n:'–'};
+/* Schriftfarbe eines Vitalwerts: Ampelfarbe, beim Gewicht (keine Ampel) die normale Schriftfarbe statt Grau. */
+const metricInk=(type,c)=>hasAmpel(type)?CAT_INK[c]:'var(--ink)';
 
-/* ---------- Wischen zwischen Blutdruck · Temperatur · Sauerstoff ----------
+/* ---------- Wischen zwischen Blutdruck · Temperatur · Sauerstoff · Gewicht ----------
    Für Verlauf, Diagramm und Erfassen (Variante B). Nach links wischen = der Wert rechts daneben, am Ende kein Umlauf.
    Passive Touch-Ereignisse, damit senkrechtes Scrollen ungestört bleibt. Am Bildschirmrand gehört die Geste dem
    System (Zurück wischen). current() liefert den aktiven Wert oder null, wenn gerade nicht gewischt werden darf.
    pager (swipePager): folgt dem Finger, solange gewischt wird. Beim Loslassen zählt nur die Strecke, nicht die Dauer. */
-const METRIC_ORDER=['bp','temp','spo2'];
+const METRIC_ORDER=['bp','temp','spo2','weight'];
 function onMetricSwipe(el,current,pager){
   let s=null;
   el.addEventListener('touchstart',ev=>{
@@ -342,10 +344,10 @@ function swipePager(stage,ink,current,show,scroller){
 /* ---------- Erfassen (geführte Eingabe) ----------
    Ein Feld nach dem anderen über einen eigenen Ziffernblock: große Vorschauzahl, Segment-Kacheln mit
    Ampel-Rückmeldung, Fortschrittsbalken, Datum/Uhrzeit- und Notiz-Sheet. Feldliste je Art (CAP_MODES):
-   'bp' Sys → Dia → Puls · 'temp' · 'spo2' · 'alle' = alles nacheinander (großes +, Variante C).
+   'bp' Sys → Dia → Puls · 'temp' · 'spo2' · 'weight' · 'alle' = alles nacheinander (großes +, Variante C).
    Ziffern-Logik (2 oder 3 Stellen, 0 am Anfang ignorieren), Ampel und Prüf-Hinweise je Feld: vitals.js.
    Speichert über addEntry/addVital (neu) bzw. updateEntry/updateVital (Bearbeiten). */
-const CAP_MODES={bp:['sys','dia','pulse'],temp:['temp'],spo2:['spo2'],alle:['sys','dia','pulse','temp','spo2']};
+const CAP_MODES={bp:['sys','dia','pulse'],temp:['temp'],spo2:['spo2'],weight:['weight'],alle:['sys','dia','pulse','temp','spo2','weight']};
 /* Rahmenfarbe der „erledigten" Kachel (weiches Ampel-Linien-Pendant zu CAT_SOFT/-BAR). */
 const CAT_LINE={g:'color-mix(in srgb,var(--g-bar) 34%,var(--line))',
                 y:'color-mix(in srgb,var(--y-bar) 34%,var(--line))',
@@ -372,7 +374,7 @@ function capSyncDateChip(){
   $('#capDateChip').classList.toggle('past',!sameDay(cap.date,new Date()));
 }
 
-/* Öffnen. opts: {mode:'bp'|'temp'|'spo2'|'alle', switcher:true (Variante B)} für eine neue Messung,
+/* Öffnen. opts: {mode:'bp'|'temp'|'spo2'|'weight'|'alle', switcher:true (Variante B)} für eine neue Messung,
    {entry} bzw. {vital} zum Bearbeiten. returnTab = Ziel beim Schließen/Speichern. */
 function startCapture(opts,returnTab){
   opts=opts||{};
@@ -401,7 +403,7 @@ function startCapture(opts,returnTab){
   const top=viewStack[viewStack.length-1];
   if(top&&top.sheet==='#plusSheet') navReplace('capture',null); else navPush('capture',null);
 }
-/* Variante B: oben zwischen Blutdruck, Temperatur und Sauerstoff wechseln (Eingaben je Feld bleiben erhalten). */
+/* Variante B: oben zwischen Blutdruck, Temperatur, Sauerstoff und Gewicht wechseln (Eingaben je Feld bleiben erhalten). */
 function capSetMode(m){ if(!CAP_MODES[m]||m===cap.mode) return; cap.mode=m; cap.fields=CAP_MODES[m]; cap.step=0; capUpdate(); }
 
 /* Darf der Puls fehlen? Im Durchgang C und beim Bearbeiten einer Messung, die keinen Puls hatte. */
@@ -418,12 +420,12 @@ function capRecords(){
       else recs.push({kind:'bp',sys:rawValue('sys',s),dia:rawValue('dia',d),pulse:p?rawValue('pulse',p):null});
     }
   }
-  ['temp','spo2'].forEach(k=>{
+  VITAL_TYPES.forEach(k=>{
     if(!has(k)) return;
     const r=g(k);
     if(!r){ if(cap.mode!=='alle') err=err||'Bitte einen Wert eingeben.'; return; }
     if(spo2Over(k,r)) err=err||'Über 100 % ist nicht möglich.';
-    else if(!rawComplete(k,r)) err=err||(k==='temp'?'Bitte drei Ziffern eingeben, z. B. 368 für 36,8 °C.':'Bitte den Wert vollständig eingeben.');
+    else if(!rawComplete(k,r)) err=err||(k==='temp'?'Bitte drei Ziffern eingeben, z. B. 368 für 36,8 °C.':k==='weight'?'Bitte vollständig eingeben, z. B. 825 für 82,5 kg.':'Bitte den Wert vollständig eingeben.');
     else recs.push({kind:k,value:rawValue(k,r)});
   });
   if(!err&&!recs.length) err='Noch kein Wert eingegeben.';
@@ -501,7 +503,7 @@ function capBump(){ const b=$('#capBig'); b.classList.remove('bump'); void b.off
 function capPressDigit(d){
   const key=cap.fields[cap.step], raw=cap.f[key]||'';
   if(raw===''&&d==='0') return;                                 // 0 am Anfang ignorieren
-  if(raw.length>=3||raw.length>=digitTarget(key,raw)) return;   // nicht mehr Ziffern als vorgesehen
+  if(raw.length>=digitTarget(key,raw)) return;                  // nicht mehr Ziffern als vorgesehen
   const nv=raw+d; cap.f[key]=nv;
   // vollständig → automatisch zum nächsten Feld (beim letzten Feld bleibt die Eingabe stehen)
   if(rawComplete(key,nv)&&!spo2Over(key,nv)&&cap.step<cap.fields.length-1) cap.step++;
@@ -664,12 +666,12 @@ document.addEventListener('keydown',ev=>{
 });
 
 /* ---------- Verlauf (Liste) ----------
-   Chronologische Liste. Oben der Umschalter Blutdruck · Temperatur · Sauerstoff (viewMetric, flüchtig,
+   Chronologische Liste. Oben der Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht (viewMetric, flüchtig,
    geteilt mit dem Diagramm, startet bei Blutdruck). Blutdruck: Sys und Dia je in ihrer eigenen Ampelfarbe
-   (catVal), Zeilenpunkt = der schlechtere. Temperatur/Sauerstoff: Wert in Ampelfarbe (catMetric).
+   (catVal), Zeilenpunkt = der schlechtere. Temperatur/Sauerstoff: Wert in Ampelfarbe (catMetric), Gewicht ohne Ampel.
    Zeitraum unten: 7/30/90 Tage + „Zeitraum" (Von–Bis-Sheet). Zeile antippen → Detail-Screen. */
 let verlaufRange='30';
-let viewMetric='bp';                       // 'bp' | 'temp' | 'spo2' – gilt für Verlauf UND Diagramm
+let viewMetric='bp';                       // 'bp' | 'temp' | 'spo2' | 'weight' – gilt für Verlauf UND Diagramm
 const RANK={n:0,g:1,y:2,r:3};
 const worseCat=(a,b)=>RANK[b]>RANK[a]?b:a;
 const IC_CHEV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
@@ -726,9 +728,9 @@ function renderTable(){
           +'<span class="vrow-p tnum">'+fmtPulse(e.pulse)+'</span>';
       }else{
         const k=catMetric(e.type,e.value);
-        html+='<span class="vrow-dot" style="background:'+CAT_BAR[k.c]+'"></span>'
+        html+=(hasAmpel(e.type)?'<span class="vrow-dot" style="background:'+CAT_BAR[k.c]+'"></span>':'')
           +'<span class="vrow-main"><span class="vrow-date">'+vDate(d)+'</span><span class="vrow-sub">'+time+(e.note?IC_NOTE_SM:'')+'</span></span>'
-          +'<span class="vrow-m tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetricUnit(e.type,e.value)+'</span>';
+          +'<span class="vrow-m tnum" style="color:'+metricInk(e.type,k.c)+'">'+fmtMetricUnit(e.type,e.value)+'</span>';
       }
       html+='<span class="vrow-chev">'+IC_CHEV+'</span></button>';
     });
@@ -736,7 +738,7 @@ function renderTable(){
   }
   if(currentTab==='table') requestAnimationFrame(positionVInk);
 }
-/* Umschalter Blutdruck · Temperatur · Sauerstoff (je einer in Verlauf und Diagramm, gleicher Zustand). */
+/* Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht (je einer in Verlauf und Diagramm, gleicher Zustand). */
 function setViewMetric(m){
   if(m===viewMetric) return;
   viewMetric=m;
@@ -822,30 +824,33 @@ function findRecord(id){
   const v=vitals.find(x=>x.id===id); return v?{kind:'vital',rec:v}:null;
 }
 const IC_INFO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
-/* Detail für Temperatur/Sauerstoff: großer Wert in Ampelfarbe, Datum, Position auf der Ampel-Skala
+/* Detail für Temperatur/Sauerstoff/Gewicht: großer Wert in Ampelfarbe, Datum, Position auf der Ampel-Skala
    (metricScale: Temperatur Gelb auf beiden Seiten, Sauerstoff umgedreht), Notiz; beim Sauerstoff ein
-   sachlicher Mess-Hinweis. Keine Bewertung, kein Kontext-Satz. */
+   sachlicher Mess-Hinweis. Beim Gewicht nur die Zahl: keine Ampel-Pille, keine Skala.
+   Keine Bewertung, kein Kontext-Satz. */
 function renderVitalDetail(v){
-  const M=METRICS[v.type], k=catMetric(v.type,v.value), d=new Date(v.ts), tod=todOf(d.getHours());
+  const M=METRICS[v.type], amp=hasAmpel(v.type), k=catMetric(v.type,v.value), ink=metricInk(v.type,k.c), d=new Date(v.ts), tod=todOf(d.getHours());
   const fullDate=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const time=pad2(d.getHours())+':'+pad2(d.getMinutes());
-  const sc=metricScale(v.type), pct=x=>clamp((x-sc.lo)/(sc.hi-sc.lo)*100,0,100);
-  const grad='linear-gradient(90deg,'+sc.segs.map(g=>CAT_SOFT[g[0]]+' '+pct(g[1]).toFixed(1)+'% '+pct(g[2]).toFixed(1)+'%').join(',')+')';
-  let html='<div class="det-hero">'
-    +'<span class="det-pill" style="background:'+CAT_SOFT[k.c]+';color:'+CAT_INK[k.c]+'"><span class="d" style="background:'+CAT_BAR[k.c]+'"></span>'+k.t+'</span>'
-    +'<div class="det-nums"><div class="det-col"><span class="det-num tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetric(v.type,v.value)+'</span>'
-    +'<span class="det-num-l" style="color:'+CAT_INK[k.c]+'">'+M.name.toUpperCase()+'</span></div>'
-    +'<span class="det-unit" style="color:'+CAT_INK[k.c]+'">'+M.unit+'</span></div>'
+  let html='<div class="det-hero'+(amp?'':' no-amp')+'">'
+    +(amp?'<span class="det-pill" style="background:'+CAT_SOFT[k.c]+';color:'+CAT_INK[k.c]+'"><span class="d" style="background:'+CAT_BAR[k.c]+'"></span>'+k.t+'</span>':'')
+    +'<div class="det-nums"><div class="det-col"><span class="det-num tnum" style="color:'+ink+'">'+fmtMetric(v.type,v.value)+'</span>'
+    +'<span class="det-num-l" style="color:'+ink+'">'+M.name.toUpperCase()+'</span></div>'
+    +'<span class="det-unit" style="color:'+ink+'">'+M.unit+'</span></div>'
   +'</div>';
   html+='<div class="det-card det-date"><div class="det-date-ic">'+IC_CAL+'</div>'
     +'<div class="det-date-main"><div class="det-date-1">'+fullDate+'</div>'
     +'<div class="det-date-2">'+time+'<span class="sep"></span>'+(tod==='abends'?IC_MOON:IC_SUN)+tod+'</div></div></div>';
-  html+='<div class="det-card det-scale"><div class="det-scale-h">POSITION IM AMPELBEREICH</div>'
-    +'<div class="det-scale-row"><div class="det-scale-top"><span class="det-scale-lab">'+M.name+'</span>'
-    +'<span class="det-scale-val tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetricUnit(v.type,v.value)+' · '+k.t+'</span></div>'
-    +'<div class="det-scale-bar" style="background:'+grad+'"><span class="det-scale-mk" style="left:'+clamp(pct(v.value),4,96)+'%;background:'+CAT_BAR[k.c]+';animation-delay:.06s"></span></div>'
-    +'<div class="det-ticks">'+sc.ticks.map(t=>'<span>'+t[1]+'</span>').join('')+'</div></div>'
-  +'</div>';
+  if(amp){
+    const sc=metricScale(v.type), pct=x=>clamp((x-sc.lo)/(sc.hi-sc.lo)*100,0,100);
+    const grad='linear-gradient(90deg,'+sc.segs.map(g=>CAT_SOFT[g[0]]+' '+pct(g[1]).toFixed(1)+'% '+pct(g[2]).toFixed(1)+'%').join(',')+')';
+    html+='<div class="det-card det-scale"><div class="det-scale-h">POSITION IM AMPELBEREICH</div>'
+      +'<div class="det-scale-row"><div class="det-scale-top"><span class="det-scale-lab">'+M.name+'</span>'
+      +'<span class="det-scale-val tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetricUnit(v.type,v.value)+' · '+k.t+'</span></div>'
+      +'<div class="det-scale-bar" style="background:'+grad+'"><span class="det-scale-mk" style="left:'+clamp(pct(v.value),4,96)+'%;background:'+CAT_BAR[k.c]+';animation-delay:.06s"></span></div>'
+      +'<div class="det-ticks">'+sc.ticks.map(t=>'<span>'+t[1]+'</span>').join('')+'</div></div>'
+    +'</div>';
+  }
   if(v.note) html+='<div class="det-card det-note">'+IC_NOTE+'<div class="det-note-txt">„'+escapeHtml(v.note)+'"</div></div>';
   if(v.type==='spo2') html+='<div class="det-ctx det-info">'+IC_INFO+'<span>Kalte Finger, Nagellack oder Bewegung können den Wert verfälschen.</span></div>';
   $('#detBody').innerHTML=html;
@@ -898,7 +903,7 @@ $('#detDelete').addEventListener('click',()=>{
   const e=f.rec;
   let prev='<div class="pd">'+fmtDate(e.ts)+' · '+fmtTime(e.ts)+'</div>';
   if(f.kind==='bp') prev+='<div class="pv"><span style="color:'+CAT_INK[catValFor('sys',e.sys)]+'">'+e.sys+'</span> / <span style="color:'+CAT_INK[catValFor('dia',e.dia)]+'">'+e.dia+'</span> · Puls '+fmtPulse(e.pulse)+'</div>';
-  else prev+='<div class="pv">'+METRICS[e.type].name+' <span style="color:'+CAT_INK[catMetric(e.type,e.value).c]+'">'+fmtMetricUnit(e.type,e.value)+'</span></div>';
+  else prev+='<div class="pv">'+METRICS[e.type].name+' <span style="color:'+metricInk(e.type,catMetric(e.type,e.value).c)+'">'+fmtMetricUnit(e.type,e.value)+'</span></div>';
   askConfirm({icon:'trash',tone:'danger',danger:true,title:'Eintrag löschen?',message:'Dieser Eintrag wird dauerhaft entfernt.',previewHTML:prev,confirmLabel:'Löschen'})
     .then(ok=>{ if(ok){ if(f.kind==='bp') removeEntry(detailId); else removeVital(detailId); navBack(); toast('Eintrag gelöscht'); } });
 });
@@ -1039,8 +1044,9 @@ function setDiagPulseLayer(show){
   } else applySize();
 }
 
-/* Diagramm für Temperatur/Sauerstoff: Kopf mit Ø + Ampel-Wort, eigene Grafik (buildMetricChart, zeitgetreu),
-   Legende mit Anzahl je Ampel-Wort, darunter Höchster · Niedrigster · Messungen (Farbe = Ampel des Werts). */
+/* Diagramm für Temperatur/Sauerstoff/Gewicht: Kopf mit Ø + Ampel-Wort, eigene Grafik (buildMetricChart, zeitgetreu),
+   Legende mit Anzahl je Ampel-Wort, darunter Höchster · Niedrigster · Messungen (Farbe = Ampel des Werts).
+   Beim Gewicht (keine Ampel) entfallen Ampel-Wort und Zählung, die Zahlen stehen in normaler Schriftfarbe. */
 function renderMetricChart(type){
   const M=METRICS[type], list=getFilteredVitals(type).sort(byTsAsc), short=DG_SHORT[verlaufRange]||'30 Tage';
   lastChartList=null;
@@ -1049,19 +1055,19 @@ function renderMetricChart(type){
   $$('#dgPop button').forEach(b=>b.classList.toggle('active',b.dataset.r===verlaufRange));
   const body=$('#dgBody');
   if(!list.length){ body.innerHTML='<div class="dg-card"><div class="dg-empty">'+(vitalsOf(type).length?'Noch keine Daten im gewählten Zeitraum.':'Noch kein Wert erfasst.')+'</div></div>'; return; }
-  const avg=meanMetric(list), k=catMetric(type,avg);
-  const valHtml='<div class="dg-val"><span class="dg-val-num tnum" style="color:'+CAT_INK[k.c]+'">'+fmtMetric(type,avg)+'</span>'
+  const amp=hasAmpel(type), avg=meanMetric(list), k=catMetric(type,avg);
+  const valHtml='<div class="dg-val"><span class="dg-val-num tnum" style="color:'+metricInk(type,k.c)+'">'+fmtMetric(type,avg)+'</span>'
     +'<span class="dg-val-side"><span class="dg-val-unit">'+M.unit+'</span><span class="dg-val-sub">Ø · '+short+'</span></span></div>';
-  const statusHtml='<span class="dg-status" style="background:'+CAT_SOFT[k.c]+';color:'+CAT_INK[k.c]+'"><span class="d" style="background:'+CAT_BAR[k.c]+'"></span>'+k.t+'</span>';
+  const statusHtml=amp?'<span class="dg-status" style="background:'+CAT_SOFT[k.c]+';color:'+CAT_INK[k.c]+'"><span class="d" style="background:'+CAT_BAR[k.c]+'"></span>'+k.t+'</span>':'';
   const cnt={}; list.forEach(m=>{ const t=catMetric(type,m.value).t; cnt[t]=(cnt[t]||0)+1; });
   const order=type==='temp'?[['g','Normal'],['y','Niedrig'],['y','Erhöht'],['r','Fieber']]:[['g','Im Ziel'],['y','Niedrig'],['r','Zu niedrig']];
   const cnts=order.filter(o=>!(type==='temp'&&o[1]==='Niedrig'&&!cnt[o[1]]))
     .map(o=>'<span style="color:'+CAT_INK[o[0]]+'">'+(cnt[o[1]]||0)+' '+o[1]+'</span>').join('');
-  const legHtml='<div class="dg-legend single"><span class="avg" style="color:var(--accent)"><i style="border-color:var(--accent)"></i>Ø '+fmtMetric(type,avg)+'</span><span class="cnts">'+cnts+'</span></div>';
+  const legHtml='<div class="dg-legend single"><span class="avg" style="color:var(--accent)"><i style="border-color:var(--accent)"></i>Ø '+fmtMetric(type,avg)+'</span>'+(amp?'<span class="cnts">'+cnts+'</span>':'')+'</div>';
   const vals=list.map(m=>m.value), mx=Math.max(...vals), mn=Math.min(...vals);
   const sc=(l,v,col)=>'<div class="dg-stat"><div class="dg-stat-l">'+l+'</div><div class="dg-stat-v tnum" style="color:'+col+'">'+v+'</div></div>';
-  const statHtml='<div class="dg-stat3">'+sc('HÖCHSTER',fmtMetric(type,mx),CAT_INK[catMetric(type,mx).c])
-    +sc('NIEDRIGSTER',fmtMetric(type,mn),CAT_INK[catMetric(type,mn).c])+sc('MESSUNGEN',list.length,'var(--ink)')+'</div>';
+  const statHtml='<div class="dg-stat3">'+sc('HÖCHSTER',fmtMetric(type,mx),metricInk(type,catMetric(type,mx).c))
+    +sc('NIEDRIGSTER',fmtMetric(type,mn),metricInk(type,catMetric(type,mn).c))+sc('MESSUNGEN',list.length,'var(--ink)')+'</div>';
   body.innerHTML='<div class="dg-card"><div class="dg-cardhead">'+valHtml+statusHtml+'</div>'
     +'<div class="dg-chart">'+buildMetricChart(type,list,avg)+'</div>'+legHtml+'</div>'+statHtml;
 }
@@ -1070,7 +1076,7 @@ function renderChart(){
   applyVerlaufRange();                                 // gemeinsamer Zeitraum mit dem Verlauf
   syncMetricSeg();
   const ctr=$('#tab-chart .dg-controls'); if(ctr) ctr.classList.toggle('only-range',viewMetric!=='bp');
-  if(viewMetric!=='bp'){ renderMetricChart(viewMetric); return; }   // Temperatur/Sauerstoff: eigene Grafik, buildDiagChart bleibt unberührt
+  if(viewMetric!=='bp'){ renderMetricChart(viewMetric); return; }   // Temperatur/Sauerstoff/Gewicht: eigene Grafik, buildDiagChart bleibt unberührt
   const list=getFiltered().slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   lastChartList=list;                                  // fürs Teil-Update der Puls-Ebene (setDiagPulseLayer)
   const both=diagSeries==='both', short=DG_SHORT[verlaufRange]||'30 Tage';
@@ -1223,25 +1229,24 @@ function renderDashboard(){
   }else{
     html+='<div class="dcard dlm dlm-none">'+dHead(icSvg(IC_PATH_BP),'Blutdruck','Noch kein Wert')+'</div>';
   }
-  /* --- Letzte Messung: Temperatur | Sauerstoff --- */
-  html+='<div class="dlm-row">';
-  VITAL_TYPES.forEach(type=>{
-    const M=METRICS[type], last=vitalsOf(type).sort(byTsDesc)[0];
-    if(!last){ html+='<div class="dcard dlm dlm-none">'+dHead(icSvg(M.icon),M.name,'Noch kein Wert')+'</div>'; return; }
+  /* --- Letzte Messung: Temperatur | Sauerstoff, darunter Gewicht über die ganze Breite (ohne Ampel) --- */
+  const lastVital=type=>{
+    const M=METRICS[type], last=vitalsOf(type).sort(byTsDesc)[0], amp=hasAmpel(type), cls='dcard dlm'+(amp?'':' dlm-wide');
+    if(!last) return '<div class="'+cls+' dlm-none">'+dHead(icSvg(M.icon),M.name,'Noch kein Wert')+'</div>';
     const k=catMetric(type,last.value);
-    html+='<button type="button" class="dcard dlm" data-det="'+last.id+'">'+dHead(icSvg(M.icon),M.name,relTime(last.ts))
-      +'<span class="dlm-val sm tnum" style="color:'+CAT_INK[k.c]+'"><span class="dlm-n">'+dCount(last.value,type)+'</span><span class="dlm-u"> '+M.unit+'</span></span>'
-      +dWord(k.c,k.t)+'</button>';
-  });
-  html+='</div>';
+    return '<button type="button" class="'+cls+'" data-det="'+last.id+'">'+dHead(icSvg(M.icon),M.name,relTime(last.ts))
+      +'<span class="dlm-val sm tnum" style="color:'+metricInk(type,k.c)+'"><span class="dlm-n">'+dCount(last.value,type)+'</span><span class="dlm-u"> '+M.unit+'</span></span>'
+      +(amp?dWord(k.c,k.t):'')+'</button>';
+  };
+  html+='<div class="dlm-row">'+lastVital('temp')+lastVital('spo2')+'</div>'+lastVital('weight');
 
   /* --- Letzte 7 Tage: Ø erst ab 3 Messungen, Ampelfarbe + Wort auf dem gerundeten Ø --- */
   html+='<h2 class="dsec">Letzte 7 Tage</h2>';
   const emptyBlock=n=>n
     ? '<span class="dst-empty"><b>Zu wenige Messungen</b><span>Ø erst ab '+DASH_MIN+' Messungen</span></span>'
     : '<span class="dst-empty"><b>Keine Messung</b><span>in den letzten 7 Tagen</span></span>';
-  const avgBlock=(n,valHtml,cat,word)=>n<DASH_MIN ? emptyBlock(n)
-    : '<span class="dst-avg" style="color:'+CAT_INK[cat]+'"><span class="dst-v tnum">'+valHtml+'</span>'+dWord(cat,word)+'</span>';
+  const avgBlock=(n,valHtml,cat,word)=>n<DASH_MIN ? emptyBlock(n)          // cat=null: keine Ampel (Gewicht)
+    : '<span class="dst-avg" style="color:'+(cat?CAT_INK[cat]:'var(--ink)')+'"><span class="dst-v tnum">'+valHtml+'</span>'+(cat?dWord(cat,word):'')+'</span>';
   // Blutdruck mit Puls-Zeile
   const bp7=entries.filter(e=>ageDays(e.ts)<=7);
   const s7=meanKey(bp7,'sys'), d7=meanKey(bp7,'dia'), p7list=bp7.filter(e=>Number.isFinite(e.pulse)), p7=meanKey(p7list,'pulse');
@@ -1257,12 +1262,12 @@ function renderDashboard(){
       +'</span>';
   }
   html+='</button>';
-  // Temperatur, Sauerstoff
+  // Temperatur, Sauerstoff, Gewicht
   VITAL_TYPES.forEach(type=>{
     const M=METRICS[type], l7=vitalsOf(type).filter(v=>ageDays(v.ts)<=7), avg=meanMetric(l7);
     const k=l7.length>=DASH_MIN?catMetric(type,avg):{c:'n',t:''};
     html+='<button type="button" class="dcard dst" data-chart="'+type+'"><span class="dst-top">'+dHead(icSvg(M.icon),M.name,'Ø 7 Tage · '+M.unit)
-      +avgBlock(l7.length,'<span class="dst-o">Ø </span><span class="dst-n">'+fmtMetric(type,avg)+'</span><span class="dst-u"> '+M.unit+'</span>',k.c,k.t)+'</span></button>';
+      +avgBlock(l7.length,'<span class="dst-o">Ø </span><span class="dst-n">'+fmtMetric(type,avg)+'</span><span class="dst-u"> '+M.unit+'</span>',hasAmpel(type)?k.c:null,k.t)+'</span></button>';
   });
 
   host.innerHTML=html;
@@ -1308,12 +1313,12 @@ function download(blob,name){
 }
 const csvCell=v=>{ v=String(v); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
 /* Eine Zeile je Datensatz, nach Zeit sortiert; Spalten anderer Werte bleiben leer (nichts wird anhand
-   gleicher Uhrzeiten zusammengelegt). Temperatur mit Dezimalkomma fürs deutsche Excel. */
+   gleicher Uhrzeiten zusammengelegt). Temperatur und Gewicht mit Dezimalkomma fürs deutsche Excel. */
 function exportCSV(){
   if(!totalCount()){ toast('Noch keine Werte zum Exportieren','notice'); return; }
-  const rows=[['Datum','Uhrzeit','Systolisch','Diastolisch','Puls','Temperatur (°C)','SpO2 (%)','Notiz']];
-  const all=entries.map(e=>({ts:e.ts,c:[e.sys,e.dia,Number.isFinite(e.pulse)?e.pulse:'','',''],note:e.note}))
-    .concat(vitals.map(v=>({ts:v.ts,c:['','','',v.type==='temp'?fmtMetric('temp',v.value):'',v.type==='spo2'?fmtMetric('spo2',v.value):''],note:v.note})));
+  const rows=[['Datum','Uhrzeit','Systolisch','Diastolisch','Puls','Temperatur (°C)','SpO2 (%)','Gewicht (kg)','Notiz']];
+  const all=entries.map(e=>({ts:e.ts,c:[e.sys,e.dia,Number.isFinite(e.pulse)?e.pulse:'',...VITAL_TYPES.map(()=>'')],note:e.note}))
+    .concat(vitals.map(v=>({ts:v.ts,c:['','','',...VITAL_TYPES.map(t=>v.type===t?fmtMetric(t,v.value):'')],note:v.note})));
   all.sort((a,b)=>new Date(a.ts)-new Date(b.ts))
     .forEach(r=>rows.push([fmtDate(r.ts),fmtTime(r.ts),...r.c,(r.note||'').replace(/\r?\n/g,' ')]));
   const csv='﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
@@ -1324,7 +1329,7 @@ function exportCSV(){
 // einheitlich für alle Backup-Wege und nötig fürs Teilen auf Android (Chrome lehnt .json beim
 // share() ab). Wiederherstellen liest per JSON.parse, die Datei-Endung spielt dabei keine Rolle.
 function backupName(){ return `blutdruck-pro-backup-${stampDateTime()}.txt`; }
-const BACKUP_VER=3;   // Version 3: zusätzlich `vitals` (Temperatur & Sauerstoff); entries bleibt unverändert lesbar für die alte App
+const BACKUP_VER=3;   // Version 3: zusätzlich `vitals` (Temperatur, Sauerstoff, Gewicht); entries bleibt unverändert lesbar für die alte App
 /* Nur die „Vorlieben" sichern – geräte-interne Erinnerungs-Merker (firstDirtyAt/snoozeUntil) bleiben außen vor. */
 function backupSettings(){ const {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode}=settings; return {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode}; }
 function backupData(){ return {app:'blutdruck',version:BACKUP_VER,exportedAt:new Date().toISOString(),entries,vitals,settings:backupSettings()}; }
@@ -1909,7 +1914,7 @@ const RP={
   acc:{Kobalt:'#1E5FE0',Indigo:'#3B3F9E',Petrol:'#0E7C93',Violett:'#7048C4',Graphit:'#3C4A5E'}
 };
 const RP_ACC_ORDER=['Kobalt','Indigo','Petrol','Violett','Graphit'];
-let reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true};
+let reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true,gewicht:true};
 const rpAcc=()=>RP.acc[reportState.accent]||RP.acc.Kobalt;
 
 const rpIso=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
@@ -2111,10 +2116,12 @@ function rpLandscape(rep,pageNo){
     : `<div style="flex:1;background:${RP.surf2};border-radius:16px;padding:15px 17px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};margin-bottom:10px">BLUTDRUCKVERLAUF · WERT & DATUM JE MESSPUNKT</div><div style="flex:1;display:flex;align-items:stretch">${rpChart(rep,1035,puls,acc,true)}</div>${rpLegend(puls)}</div>`;
   return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpFoot(rep,'Seite '+(pageNo||2)+' · Anhang',{noTod:true})}</div>`;
 }
-/* ---- A4-Seite „Temperatur & Sauerstoff" (Hochformat, nach Seite 1; Schalter im Report-Menü) ----
+/* ---- A4-Seite „Temperatur, Sauerstoff & Gewicht" (Hochformat, nach Seite 1; zwei Schalter im Report-Menü) ----
    Gleiche Bausteine und feste helle Palette wie Seite 1. Je Wert: Ø in Ampelfarbe + Ampel-Wort
-   (catMetric auf dem gerundeten Ø), Tiefst–Höchst, Anzahl, Verlauf; darunter eine gemeinsame Werteliste.
-   Rein beschreibend, keine Bewertung. Spezifikation: arzt-report-spezifikation.md, Abschnitt 9. */
+   (catMetric auf dem gerundeten Ø, Gewicht ohne Ampel), Tiefst–Höchst, Anzahl, Verlauf; darunter eine gemeinsame
+   Werteliste. Rein beschreibend, keine Bewertung. Spezifikation: arzt-report-spezifikation.md, Abschnitt 9.
+   temp/spo2/weight zählen immer alles im Zeitraum (Report-Menü); was auf die Seiten kommt, steht in metrics und
+   richtet sich nach den Schaltern. Ohne Gewicht im Zeitraum sieht die Seite aus wie zuvor. */
 function reportVitals(from,to){
   const lo=new Date(from.getFullYear(),from.getMonth(),from.getDate()).getTime();
   const hi=new Date(to.getFullYear(),to.getMonth(),to.getDate(),23,59,59,999).getTime();
@@ -2125,19 +2132,36 @@ function reportVitals(from,to){
     return {type,list:a,count:a.length,avg,cat:avg!=null?catMetric(type,avg):{c:'n',t:'—'},
       min:vals.length?Math.min(...vals):null,max:vals.length?Math.max(...vals):null};
   };
-  // Werteliste: Temperatur und Sauerstoff mit GLEICHEM Zeitpunkt (Durchgang „Alles nacheinander") in einer Zeile.
+  const temp=per('temp'), spo2=per('spo2'), weight=per('weight');
+  const withTS=reportState.vital&&temp.count+spo2.count>0, withW=reportState.gewicht&&weight.count>0;
+  const metrics=[...(withTS?[temp,spo2]:[]),...(withW?[weight]:[])];
+  const shown=list.filter(v=>metrics.some(m=>m.type===v.type));
+  // Werteliste: Werte mit GLEICHEM Zeitpunkt (Durchgang „Alles nacheinander") in einer Zeile.
   const byTs=new Map();
-  list.forEach(v=>{ const r=byTs.get(v.ts)||{ts:v.ts,notes:[]}; r[v.type]=v.value; if(v.note&&!r.notes.includes(v.note)) r.notes.push(v.note); byTs.set(v.ts,r); });
+  shown.forEach(v=>{ const r=byTs.get(v.ts)||{ts:v.ts,notes:[]}; r[v.type]=v.value; if(v.note&&!r.notes.includes(v.note)) r.notes.push(v.note); byTs.set(v.ts,r); });
   const rows=[...byTs.values()].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  return {count:list.length,temp:per('temp'),spo2:per('spo2'),rows};
+  const title=withTS&&withW?'Temperatur, Sauerstoff & Gewicht':withW?'Gewicht':'Temperatur & Sauerstoff';
+  return {count:shown.length,temp,spo2,weight,metrics,withTS,withW,rows,title};
 }
-const rpVAmp=(type,v)=>RP.amp[catMetric(type,v).c]||RP.amp.n;
+/* Farben eines Messpunkts: Ampel, beim Gewicht Akzentfarbe (Punkt) und normale Schrift (Zahl). */
+const rpVAmp=(type,v)=>hasAmpel(type)?(RP.amp[catMetric(type,v).c]||RP.amp.n):{bar:rpAcc(),ink:RP.ink};
+const RP_VNAME={temp:'TEMPERATUR',spo2:'SAUERSTOFF (SpO₂)',weight:'GEWICHT'};
+/* „10 Temperatur · 9 Sauerstoff · 5 Gewicht" (Werte ohne Messung entfallen). */
+const rpParts=ms=>ms.filter(m=>m.count).map(m=>m.count+' '+METRICS[m.type].name).join(' · ');
+/* Höhenachse der Report-Grafiken. Gewicht über metricAxis (ganze kg, Schritt nach Spanne), weil der
+   feste Schritt 0,5 dort viel zu viele Gitterlinien ergäbe. padT/padS = Luft bei Temperatur bzw. Sauerstoff. */
+function rpRange(m,padT,padS){
+  if(m.type==='weight') return metricAxis('weight',m.list.map(v=>v.value));
+  const dec=METRICS[m.type].dec, step=dec?0.5:2, padV=dec?padT:padS;
+  const lo=Math.floor((m.min-padV)/step)*step; let hi=Math.ceil((m.max+padV)/step)*step;
+  if(m.type==='spo2') hi=Math.min(hi,100+step);
+  return {lo,hi,step};
+}
+const rpTick=(type,t)=>type==='weight'?String(t):fmtMetric(type,t);
 function rpMetricChart(m,W,acc){
   const list=m.list, n=list.length; if(!n) return '';
-  const dec=METRICS[m.type].dec, padL=34, padR=46, top=12, bot=132, axisY=bot, dateY=axisY+19, H=dateY+6;
-  const step=dec?0.5:2, padV=dec?0.3:1.5;
-  let lo=Math.floor((m.min-padV)/step)*step, hi=Math.ceil((m.max+padV)/step)*step;
-  if(m.type==='spo2') hi=Math.min(hi,100+step);
+  const padL=34, padR=46, top=12, bot=132, axisY=bot, dateY=axisY+19, H=dateY+6;
+  const {lo,hi,step}=rpRange(m,0.3,1.5);
   const span=(hi-lo)||1, y=v=>+(bot-(v-lo)/span*(bot-top)).toFixed(1);
   const tvs=list.map(v=>new Date(v.ts).getTime()), tlo=Math.min(...tvs), tspan=(Math.max(...tvs)-tlo)||1;
   const xs=tvs.map(t=>n===1?+((padL+W-padR)/2).toFixed(1):+(padL+(t-tlo)/tspan*(W-padL-padR)).toFixed(1));
@@ -2145,7 +2169,7 @@ function rpMetricChart(m,W,acc){
   const gs=(hi-lo)/step>6?step*2:step;
   for(let t=Math.ceil(lo/gs)*gs; t<=hi+1e-9; t+=gs){
     s+=`<line x1="${padL}" y1="${y(t)}" x2="${W-padR}" y2="${y(t)}" stroke="${RP.ink}" stroke-opacity=".07" stroke-width="1"/>`;
-    s+=`<text x="2" y="${y(t)+3.4}" font-size="9" font-weight="700" fill="${RP.faint}">${fmtMetric(m.type,t)}</text>`;
+    s+=`<text x="2" y="${y(t)+3.4}" font-size="9" font-weight="700" fill="${RP.faint}">${rpTick(m.type,t)}</text>`;
   }
   s+=`<polyline points="${list.map((v,i)=>xs[i]+','+y(v.value)).join(' ')}" fill="none" stroke="#c7d0dd" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
   s+=`<line x1="${padL}" y1="${y(m.avg)}" x2="${W-padR}" y2="${y(m.avg)}" stroke="${acc}" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>`;
@@ -2164,16 +2188,16 @@ function rpVitalPage(rep,vrep,pageLabel){
   const tile=(inner,extra='')=>`<div class="rp-blk" style="background:${RP.surf2};border-radius:16px;padding:13px 15px${extra}">${inner}</div>`;
   const mini=t=>`<div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted}">${t}</div>`;
   const field=(lab,val)=>`<div style="display:flex;flex-direction:column;gap:3px;min-width:0"><div style="font-size:9.5px;font-weight:800;letter-spacing:.09em;color:${RP.muted}">${lab}</div><div style="font-size:13px;font-weight:700;color:${RP.ink}">${val}</div></div>`;
-  const parts=[vrep.temp.count?vrep.temp.count+' Temperatur':'',vrep.spo2.count?vrep.spo2.count+' Sauerstoff':''].filter(Boolean).join(' · ');
-  const header=`<div><div style="display:flex;align-items:center;gap:11px;margin-bottom:13px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">Temperatur &amp; Sauerstoff</div><div style="font-size:11.5px;font-weight:600;color:${RP.muted};margin-top:2px">Ergänzung zum Blutdruck-Bericht</div></div><div style="font-size:11px;font-weight:700;color:${RP.muted};text-align:right">Erstellt<br><span style="color:${RP.ink};font-weight:800">${rep.created}</span></div></div>`
+  const parts=rpParts(vrep.metrics);
+  const header=`<div><div style="display:flex;align-items:center;gap:11px;margin-bottom:13px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">${escapeHtml(vrep.title)}</div><div style="font-size:11.5px;font-weight:600;color:${RP.muted};margin-top:2px">Ergänzung zum Blutdruck-Bericht</div></div><div style="font-size:11px;font-weight:700;color:${RP.muted};text-align:right">Erstellt<br><span style="color:${RP.ink};font-weight:800">${rep.created}</span></div></div>`
     +tile(`<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px">${field('ZEITRAUM',rep.period)}${field('MESSUNGEN',parts||'keine')}</div>`)+`</div>`;
   const chip=c=>{ const a=RP.amp[c.c]||RP.amp.n; return `<span style="display:inline-flex;align-items:center;gap:6px;background:${a.soft};color:${a.ink};border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:${a.bar}"></span>${c.t}</span>`; };
   const metricTile=m=>{
-    const M=METRICS[m.type], name=(m.type==='temp'?'TEMPERATUR':'SAUERSTOFF (SpO₂)')+' · '+M.unit;
+    const M=METRICS[m.type], name=RP_VNAME[m.type]+' · '+M.unit, amp=hasAmpel(m.type);
     if(!m.count) return tile(`${mini(name)}<div style="margin-top:10px;font-size:13px;font-weight:600;color:${RP.muted}">Keine Werte im Zeitraum.</div>`);
-    const avgCol=(RP.amp[m.cat.c]||RP.amp.n).ink;
+    const avgCol=amp?(RP.amp[m.cat.c]||RP.amp.n).ink:RP.ink;
     const left=`<div style="width:150px;flex:none;display:flex;flex-direction:column;gap:10px">`
-      +`<div><div style="display:flex;align-items:baseline;gap:4px"><span style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;color:${avgCol}">Ø ${fmtMetric(m.type,m.avg)}</span><span style="font-size:12px;font-weight:700;color:${RP.muted}">${M.unit}</span></div><div style="margin-top:8px">${chip(m.cat)}</div></div>`
+      +`<div><div style="display:flex;align-items:baseline;gap:4px"><span style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;color:${avgCol}">Ø ${fmtMetric(m.type,m.avg)}</span><span style="font-size:12px;font-weight:700;color:${RP.muted}">${M.unit}</span></div>${amp?`<div style="margin-top:8px">${chip(m.cat)}</div>`:''}</div>`
       +`<div style="border-top:1px solid ${RP.line};padding-top:8px;display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:700;color:${RP.ink}">`
       +`<div style="display:flex;justify-content:space-between"><span style="color:${RP.muted}">Tiefst – Höchst</span></div><div style="font-size:13px;font-weight:800">${fmtMetric(m.type,m.min)} – ${fmtMetric(m.type,m.max)} ${M.unit}</div>`
       +`<div style="color:${RP.muted};font-weight:600">${m.count} Messung${m.count===1?'':'en'}</div></div></div>`;
@@ -2181,47 +2205,47 @@ function rpVitalPage(rep,vrep,pageLabel){
   };
   const dot=c=>`<span style="width:9px;height:9px;border-radius:50%;flex:none;background:${c}"></span>`;
   const valCell=(type,v)=>v==null?`<div style="text-align:right;font-size:13px;font-weight:700;color:#c2cad6">—</div>`
-    :`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">${dot(rpVAmp(type,v).bar)}<span style="font-size:13.5px;font-weight:800;color:${rpVAmp(type,v).ink}">${fmtMetric(type,v)}</span></div>`;
-  const cols='1fr 46px 80px 80px 1.7fr', WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+    :`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">${hasAmpel(type)?dot(rpVAmp(type,v).bar):''}<span style="font-size:13.5px;font-weight:800;color:${rpVAmp(type,v).ink}">${fmtMetric(type,v)}</span></div>`;
+  // Spalten nur für Werte, die auf der Seite stehen (ohne Gewicht wie zuvor).
+  const tc=[['temp','TEMP. °C'],['spo2','SpO₂ %'],['weight','GEWICHT kg']].filter(c=>vrep.metrics.some(m=>m.type===c[0])), wide=tc.length>2;
+  const cols='1fr 46px '+tc.map(()=>wide?'72px':'80px').join(' ')+' '+(wide?'1.4fr':'1.7fr'), WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
   const hc=(t,r)=>`<div style="font-size:9.5px;font-weight:800;letter-spacing:.06em${r?';text-align:right':''}">${t}</div>`;
-  let rows=`<div style="display:grid;grid-template-columns:${cols};gap:10px;align-items:center;padding:0 12px 8px;color:${RP.muted}">${hc('DATUM')}${hc('ZEIT')}${hc('TEMP. °C',1)}${hc('SpO₂ %',1)}${hc('NOTIZ')}</div>`;
+  let rows=`<div style="display:grid;grid-template-columns:${cols};gap:10px;align-items:center;padding:0 12px 8px;color:${RP.muted}">${hc('DATUM')}${hc('ZEIT')}${tc.map(c=>hc(c[1],1)).join('')}${hc('NOTIZ')}</div>`;
   vrep.rows.forEach((r,i)=>{ const d=new Date(r.ts);
     rows+=`<div class="rp-trow" style="display:grid;grid-template-columns:${cols};gap:10px;align-items:center;padding:8px 12px;border-top:1px solid ${RP.line}${i%2===1?';background:'+RP.surf2:''}">`
       +`<div style="font-size:12px;font-weight:700;color:${RP.ink}">${WD[d.getDay()]} ${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.</div>`
       +`<div style="font-size:11.5px;font-weight:600;color:${RP.muted}">${fmtTime(r.ts)}</div>`
-      +valCell('temp',r.temp)+valCell('spo2',r.spo2)
+      +tc.map(c=>valCell(c[0],r[c[0]])).join('')
       +`<div style="font-size:11px;font-weight:500;color:${RP.muted};line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes.length?escapeHtml(r.notes.join(' · ')):'—'}</div></div>`; });
   const table=`<div class="rp-tabletile" style="background:${RP.surf};border:1px solid ${RP.line};border-radius:16px;overflow:hidden"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};padding:13px 15px 6px">ALLE WERTE · ${vrep.count}</div><div style="padding:0 4px 8px">${rows}</div></div>`;
-  return `<div class="rp-page" style="width:794px;min-height:1123px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:38px 40px 34px"><div style="display:flex;flex-direction:column;gap:13px;flex:1">${header}${metricTile(vrep.temp)}${metricTile(vrep.spo2)}${table}</div>${rpVFoot(pageLabel)}</div>`;
+  return `<div class="rp-page" style="width:794px;min-height:1123px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:38px 40px 34px"><div style="display:flex;flex-direction:column;gap:13px;flex:1">${header}${vrep.metrics.map(metricTile).join('')}${table}</div>${rpVFoot(pageLabel,vrep.withTS)}</div>`;
 }
-/* Fußzeile der Temperatur-&-Sauerstoff-Seiten: angewendete Grenzen (settings.thr) + Haftungshinweis. */
-function rpVFoot(pageLabel){
+/* Fußzeile der Vitalwerte-Seiten: angewendete Grenzen (settings.thr, nur mit Temperatur/Sauerstoff) + Haftungshinweis. */
+function rpVFoot(pageLabel,withTS){
   const t=settings.thr, f=v=>String(v).replace('.',',');
   return `<div style="margin-top:auto;padding-top:18px;border-top:1px solid ${RP.line};font-size:10.5px;line-height:1.5;color:${RP.muted};display:flex;justify-content:space-between;gap:16px"><div style="max-width:760px;display:flex;flex-direction:column;gap:4px">`
-    +`<div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>Temperatur normal ab ${fmtMetric('temp',t.tempLow)} °C (darunter niedrig), erhöht ab ${fmtMetric('temp',t.tempY)} °C, Fieber ab ${fmtMetric('temp',t.tempR)} °C · Sauerstoff im Ziel ab ${f(t.spo2G)} %, niedrig ab ${f(t.spo2Y)} %, darunter zu niedrig.</div>`
+    +(!withTS?'':`<div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>Temperatur normal ab ${fmtMetric('temp',t.tempLow)} °C (darunter niedrig), erhöht ab ${fmtMetric('temp',t.tempY)} °C, Fieber ab ${fmtMetric('temp',t.tempR)} °C · Sauerstoff im Ziel ab ${f(t.spo2G)} %, niedrig ab ${f(t.spo2Y)} %, darunter zu niedrig.</div>`)
     +`<div>Rein beschreibende Auswertung der erfassten Werte — keine ärztliche Bewertung oder Diagnose.</div></div><div style="text-align:right;white-space:nowrap">Blutdruck Pro<br>${pageLabel}</div></div>`;
 }
-/* Anhang „Temperatur & Sauerstoff" (Querformat): beide Werte auf EINER Seite, je ein Band übereinander mit
-   gemeinsamer zeitgetreuer X-Achse, Wert je Messpunkt (wie Sys/Dia im Blutdruck-Anhang) und Datum. */
+/* Anhang Temperatur/Sauerstoff/Gewicht (Querformat): alle gewählten Werte auf EINER Seite, je ein Band (bis zu drei)
+   übereinander mit gemeinsamer zeitgetreuer X-Achse, Wert je Messpunkt (wie Sys/Dia im Blutdruck-Anhang) und Datum. */
 function rpVitalChartDetail(vrep,W,acc){
-  const ms=[vrep.temp,vrep.spo2].filter(m=>m.count), all=[...vrep.temp.list,...vrep.spo2.list];
+  const ms=vrep.metrics.filter(m=>m.count), all=ms.flatMap(m=>m.list);
   if(!all.length) return '';
-  const padL=40, padR=50, both=ms.length===2, axisY=532, dateY=axisY+19, H=dateY+6;
-  const bands=both?[[30,248],[318,512]]:[[30,512]];
+  const padL=40, padR=50, axisY=532, dateY=axisY+19, H=dateY+6;
+  const bands=[[[30,512]],[[30,248],[318,512]],[[30,150],[212,332],[392,512]]][ms.length-1];
   const tvs=all.map(v=>new Date(v.ts).getTime()), tlo=Math.min(...tvs), thi=Math.max(...tvs), tspan=(thi-tlo)||1;
   const xOf=ts=>thi===tlo?+((padL+W-padR)/2).toFixed(1):+(padL+(new Date(ts).getTime()-tlo)/tspan*(W-padL-padR)).toFixed(1);
   let s='';
   ms.forEach((m,bi)=>{
-    const [top,bot]=bands[bi], dec=METRICS[m.type].dec, step=dec?0.5:2, padV=dec?0.4:2;
-    let lo=Math.floor((m.min-padV)/step)*step, hi=Math.ceil((m.max+padV)/step)*step;
-    if(m.type==='spo2') hi=Math.min(hi,100+step);
+    const [top,bot]=bands[bi], {lo,hi,step}=rpRange(m,0.4,2);
     const span=(hi-lo)||1, y=v=>+(bot-(v-lo)/span*(bot-top)).toFixed(1);
-    const name=m.type==='temp'?'TEMPERATUR · °C':'SAUERSTOFF (SpO₂) · %';
+    const name=RP_VNAME[m.type]+' · '+METRICS[m.type].unit;
     s+=`<text x="2" y="${top-14}" font-size="9.5" font-weight="800" fill="${RP.muted}" letter-spacing=".08em">${name}</text>`;
     const gs=(hi-lo)/step>8?step*2:step;
     for(let t=Math.ceil(lo/gs)*gs; t<=hi+1e-9; t+=gs){
       s+=`<line x1="${padL}" y1="${y(t)}" x2="${W-padR}" y2="${y(t)}" stroke="${RP.ink}" stroke-opacity=".07" stroke-width="1"/>`;
-      s+=`<text x="2" y="${y(t)+3.4}" font-size="9" font-weight="700" fill="${RP.faint}">${fmtMetric(m.type,t)}</text>`;
+      s+=`<text x="2" y="${y(t)+3.4}" font-size="9" font-weight="700" fill="${RP.faint}">${rpTick(m.type,t)}</text>`;
     }
     s+=`<polyline points="${m.list.map(v=>xOf(v.ts)+','+y(v.value)).join(' ')}" fill="none" stroke="#c7d0dd" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
     s+=`<line x1="${padL}" y1="${y(m.avg)}" x2="${W-padR}" y2="${y(m.avg)}" stroke="${acc}" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>`;
@@ -2229,7 +2253,7 @@ function rpVitalChartDetail(vrep,W,acc){
     m.list.forEach(v=>{ const a=rpVAmp(m.type,v.value), x=xOf(v.ts), yy=y(v.value);
       s+=`<circle cx="${x}" cy="${yy}" r="4.6" fill="${a.bar}" stroke="#fff" stroke-width="1.3"/>`;
       s+=`<text x="${x}" y="${yy-9}" font-size="9" font-weight="800" fill="${a.ink}" text-anchor="middle">${fmtMetric(m.type,v.value)}</text>`; });
-    if(both&&bi===0) s+=`<line x1="${padL}" y1="${bot+30}" x2="${W-padR}" y2="${bot+30}" stroke="${RP.line}" stroke-width="1"/>`;
+    if(bi<ms.length-1) s+=`<line x1="${padL}" y1="${bot+30}" x2="${W-padR}" y2="${bot+30}" stroke="${RP.line}" stroke-width="1"/>`;
   });
   // gemeinsame Zeitachse: Strich je Messzeitpunkt, Datum mit Mindestabstand
   const xs=[...new Set(all.map(v=>v.ts))].sort((a,b)=>new Date(a)-new Date(b)).map(ts=>({ts,x:xOf(ts)}));
@@ -2245,18 +2269,18 @@ function rpVitalChartDetail(vrep,W,acc){
 }
 function rpVitalLandscape(rep,vrep,pageNo){
   const acc=rpAcc();
-  const parts=[vrep.temp.count?vrep.temp.count+' Temperatur':'',vrep.spo2.count?vrep.spo2.count+' Sauerstoff':''].filter(Boolean).join(' · ');
-  const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:12px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">Temperatur &amp; Sauerstoff · Anhang</div><div style="font-size:12px;font-weight:600;color:${RP.muted};margin-top:3px">Detaillierter Verlauf & alle Messwerte</div></div></div><div style="text-align:right"><div style="font-size:12.5px;font-weight:800;color:${RP.ink}">${rep.period}</div><div style="font-size:11px;font-weight:600;color:${RP.muted};margin-top:2px">${parts}</div></div></div>`;
+  const parts=rpParts(vrep.metrics);
+  const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:12px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">${escapeHtml(vrep.title)} · Anhang</div><div style="font-size:12px;font-weight:600;color:${RP.muted};margin-top:3px">Detaillierter Verlauf & alle Messwerte</div></div></div><div style="text-align:right"><div style="font-size:12.5px;font-weight:800;color:${RP.ink}">${rep.period}</div><div style="font-size:11px;font-weight:600;color:${RP.muted};margin-top:2px">${parts}</div></div></div>`;
   const item=(node,txt)=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:${RP.muted}">${node}${txt}</span>`;
   const disc=c=>`<span style="width:10px;height:10px;border-radius:50%;background:${c}"></span>`;
-  const legend=`<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">${item(disc(RP.amp.g.bar),'im Zielbereich')}${item(disc(RP.amp.y.bar),'etwas außerhalb')}${item(disc(RP.amp.r.bar),'deutlich außerhalb')}${item(`<span style="width:16px;height:0;border-top:2px dashed ${RP.muted}"></span>`,'Ø Mittel')}</div>`;
+  const legend=`<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">${vrep.withTS?item(disc(RP.amp.g.bar),'im Zielbereich')+item(disc(RP.amp.y.bar),'etwas außerhalb')+item(disc(RP.amp.r.bar),'deutlich außerhalb'):''}${item(`<span style="width:16px;height:0;border-top:2px dashed ${RP.muted}"></span>`,'Ø Mittel')}</div>`;
   const body=`<div style="flex:1;background:${RP.surf2};border-radius:16px;padding:15px 17px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};margin-bottom:10px">VERLAUF · WERT & DATUM JE MESSPUNKT</div><div style="flex:1;display:flex;align-items:stretch">${rpVitalChartDetail(vrep,1035,acc)}</div>${legend}</div>`;
-  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpVFoot('Seite '+pageNo+' · Anhang')}</div>`;
+  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpVFoot('Seite '+pageNo+' · Anhang',vrep.withTS)}</div>`;
 }
-/* Alle Druckseiten in der richtigen Reihenfolge: Seite 1 · Temperatur & Sauerstoff (wenn an und Werte da) ·
-   Anhang Blutdruck · Anhang Temperatur & Sauerstoff (beide nur mit „Anhangseite drucken"). */
+/* Alle Druckseiten in der richtigen Reihenfolge: Seite 1 · Temperatur/Sauerstoff/Gewicht (wenn an und Werte da) ·
+   Anhang Blutdruck · Anhang Temperatur/Sauerstoff/Gewicht (beide nur mit „Anhangseite drucken"). */
 function rpPages(rep,vrep){
-  const withV=reportState.vital&&vrep.count>0;
+  const withV=vrep.count>0;                // vrep.count zählt nur, was nach den Schaltern auf die Seiten kommt
   return {withV, p1:rpPage(rep), pv:withV?rpVitalPage(rep,vrep,'Seite 2'):'', pa:reportState.anhang?rpLandscape(rep,withV?3:2):'',
     pa2:reportState.anhang&&withV?rpVitalLandscape(rep,vrep,4):''};
 }
@@ -2307,13 +2331,15 @@ function renderReport(){
   const swatch=l=>{ const on=reportState.accent===l; return `<button class="rp-swatch${on?' active':''}" data-rp="acc" data-val="${l}" title="${l}" type="button" style="--sw:${RP.acc[l]}">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}</button>`; };
   const farbe=card(lbl('REPORT-FARBE')+`<div class="rp-swatches">${RP_ACC_ORDER.map(swatch).join('')}</div>`);
   const tog=(k,t,sub)=>`<div class="rp-opt"><div class="rp-opt-txt"><div class="rp-opt-t">${t}</div>${sub?`<div class="rp-opt-s">${sub}</div>`:''}</div><button class="rp-toggle${reportState[k]?' on':''}" data-rp="toggle" data-val="${k}" type="button" role="switch" aria-checked="${reportState[k]?'true':'false'}"><span class="rp-knob"></span></button></div>`;
-  const vSub=vrep.count?'Eigene Seite: '+[vrep.temp.count?vrep.temp.count+' Temperatur':'',vrep.spo2.count?vrep.spo2.count+' Sauerstoff':''].filter(Boolean).join(' · '):'Keine Werte im Zeitraum';
-  const opt=card(lbl('OPTIONEN')+tog('namen','Namensfeld zum Ausfüllen')+tog('puls','Puls einbeziehen')+tog('vital','Temperatur & Sauerstoff einbeziehen',vSub)+tog('anhang',pg.withV?'Anhangseiten drucken':'Anhangseite drucken',pg.withV?'Detail-Diagramme im Querformat (Seite 3 und 4)':'Detail-Diagramm im Querformat (Seite 2)'));
+  // Die Zählung bleibt unabhängig von den Schaltern: Sie sagt, was es im Zeitraum gibt.
+  const vSub=vrep.temp.count+vrep.spo2.count?'Eigene Seite: '+rpParts([vrep.temp,vrep.spo2]):'Keine Werte im Zeitraum';
+  const wN=vrep.weight.count, wSub=wN?wN+(wN===1?' Messung':' Messungen')+' im Zeitraum':'Keine Werte im Zeitraum';
+  const opt=card(lbl('OPTIONEN')+tog('namen','Namensfeld zum Ausfüllen')+tog('puls','Puls einbeziehen')+tog('vital','Temperatur & Sauerstoff einbeziehen',vSub)+tog('gewicht','Gewicht einbeziehen',wSub)+tog('anhang',pg.withV?'Anhangseiten drucken':'Anhangseite drucken',pg.withV?'Detail-Diagramme im Querformat (Seite 3 und 4)':'Detail-Diagramm im Querformat (Seite 2)'));
   const shot=(w,html)=>`<div class="rp-shot" data-w="${w}"><div class="rp-scaler">${html}</div></div>`;
   const preview=`<div class="rp-card rp-preview">${lbl('VORSCHAU')}${shot(794,pg.p1)}`
-    +(pg.withV?`<div class="rp-anh-lbl">SEITE 2 · TEMPERATUR &amp; SAUERSTOFF</div>${shot(794,pg.pv)}`:'')
+    +(pg.withV?`<div class="rp-anh-lbl">SEITE 2 · ${escapeHtml(vrep.title.toUpperCase())}</div>${shot(794,pg.pv)}`:'')
     +(reportState.anhang?`<div class="rp-anh-lbl">ANHANG · Seite ${pg.withV?3:2} · Querformat</div>${shot(1123,pg.pa)}`:'')
-    +(pg.pa2?`<div class="rp-anh-lbl">ANHANG · Seite 4 · Temperatur &amp; Sauerstoff</div>${shot(1123,pg.pa2)}`:'')+`</div>`;
+    +(pg.pa2?`<div class="rp-anh-lbl">ANHANG · Seite 4 · ${escapeHtml(vrep.title)}</div>${shot(1123,pg.pa2)}`:'')+`</div>`;
   $('#rpBody').innerHTML=zeit+farbe+opt+preview;
   $('#reportPrint').innerHTML=pg.p1+pg.pv+pg.pa+pg.pa2;
   rpScalePreview();
@@ -2329,7 +2355,7 @@ function rpScalePreview(){
 }
 /* Report öffnen: Zustand IMMER auf Standard zurücksetzen (flüchtig), dann als eigene Ebene öffnen. */
 function openReport(){
-  reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true};
+  reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true,gewicht:true};
   rpLoadFont();                       // Schrift für „Als Datei teilen" vorab laden
   navPush('report',null);
 }

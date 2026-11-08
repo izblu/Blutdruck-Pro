@@ -63,6 +63,7 @@
         <button type="button" data-m="bp">Blutdruck</button>
         <button type="button" data-m="temp">Temperatur</button>
         <button type="button" data-m="spo2">Sauerstoff</button>
+        <button type="button" data-m="weight">Gewicht</button>
       </div>
 
       <!-- Dieser Bereich gleitet beim Wischen (Variante B) -->
@@ -155,12 +156,13 @@
         <div class="vh-sub" id="vhSub">—</div>
       </div>
     </div>
-    <!-- Umschalter Blutdruck · Temperatur · Sauerstoff (gleicher Zustand wie im Diagramm) -->
+    <!-- Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht (gleicher Zustand wie im Diagramm) -->
     <div class="metric-seg" role="group" aria-label="Wert wählen">
       <span class="metric-seg-ink"></span>
       <button type="button" data-metric="bp">Blutdruck</button>
       <button type="button" data-metric="temp">Temperatur</button>
       <button type="button" data-metric="spo2">Sauerstoff</button>
+      <button type="button" data-metric="weight">Gewicht</button>
     </div>
     <!-- Dieser Bereich gleitet beim Wischen -->
     <div class="swipe-stage" id="vStage">
@@ -209,6 +211,7 @@
       <button type="button" data-metric="bp">Blutdruck</button>
       <button type="button" data-metric="temp">Temperatur</button>
       <button type="button" data-metric="spo2">Sauerstoff</button>
+      <button type="button" data-metric="weight">Gewicht</button>
     </div>
     <!-- Karte (Wert/Status + SVG-Grafik + Legende) · Statistik · Kontext füllt renderChart(). Gleitet beim Wischen. -->
     <div class="swipe-stage" id="dgStage"><div class="dg-body" id="dgBody"></div></div>
@@ -293,6 +296,9 @@
     <button class="plus-opt" data-m="spo2" type="button">
       <span class="plus-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17a4 4 0 1 0 8 0a4 4 0 1 0-8 0M13.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0-5.6 0M8.1 7.5a1.9 1.9 0 1 0 3.8 0a1.9 1.9 0 1 0-3.8 0M13.8 4a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0-2.4 0"/></svg></span>
       <span class="plus-txt"><b>Sauerstoff</b><span>Sauerstoffsättigung (SpO₂) in %</span></span></button>
+    <button class="plus-opt" data-m="weight" type="button">
+      <span class="plus-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zM7.5 10a6 6 0 0 1 9 0M12 11l1.8-3"/></svg></span>
+      <span class="plus-txt"><b>Gewicht</b><span>Körpergewicht in kg</span></span></button>
   </div>
 </div>
 
@@ -338,7 +344,7 @@
         </div>
         <p class="m-warn" id="fsWarn" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg>
-          <span>Diese Datei nie zusätzlich in der alten Blutdruck-App verknüpfen. Sie würde die Datei ohne Temperatur und Sauerstoff überschreiben.</span></p>
+          <span>Diese Datei nie zusätzlich in der alten Blutdruck-App verknüpfen. Sie würde die Datei ohne Temperatur, Sauerstoff und Gewicht überschreiben.</span></p>
       </div>
 
       <div class="grp-card">
@@ -500,6 +506,7 @@
         <p class="hlp-pt">Blutdruck: Systolisch, Diastolisch und Puls nacheinander.</p>
         <p class="hlp-pt">Temperatur: drei Ziffern, das Komma setzt die App. Aus 368 wird 36,8 °C.</p>
         <p class="hlp-pt">Sauerstoff: zwei oder drei Ziffern, höchstens 100 %.</p>
+        <p class="hlp-pt">Gewicht: drei Ziffern, ab 100 kg vier, das Komma setzt die App. Aus 825 wird 82,5 kg, aus 1025 wird 102,5 kg.</p>
         <p>Ist ein Wert vollständig, springt die App von selbst zum nächsten. Mit „Überspringen“ gehst du ohne Eingabe ein Feld weiter, im letzten Feld tippst du auf „Speichern“.</p>
         <p>Datum und Uhrzeit stehen links über dem Ziffernblock und sind auf jetzt eingestellt. Zum Ändern tippst du darauf. Eine Notiz (z. B. „nach dem Sport“) ist freiwillig.</p>
       </div>
@@ -513,7 +520,7 @@
       <div class="hlp-body" id="hlp2" hidden>
         <p>Was das große + macht, legst du unter Menü → „Anzeige“ → „Neue Messung (Plus-Button)“ fest.</p>
         <p class="hlp-pt">„Erst wählen“ fragt zuerst, was du messen möchtest.</p>
-        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck. Zu Temperatur oder Sauerstoff wechselst du oben oder durch Wischen nach links und rechts.</p>
+        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck. Zu Temperatur, Sauerstoff oder Gewicht wechselst du oben oder durch Wischen nach links und rechts.</p>
         <p class="hlp-pt">„Alles nacheinander“ (Standard) führt dich durch alle Werte; was du nicht gemessen hast, überspringst du. Eine Notiz gilt dann für alle Werte dieses Durchgangs.</p>
       </div>
     </div>
@@ -524,8 +531,8 @@
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="hlp-body" id="hlp3" hidden>
-        <p>Oben steht deine letzte Messung mit Ampel-Farbe und Ampel-Wort.</p>
-        <p>Darunter siehst du für Blutdruck, Puls, Temperatur und Sauerstoff den Durchschnitt der letzten 7 Tage, ebenfalls mit Ampel-Farbe (beim Puls ohne). Einen Durchschnitt gibt es erst ab 3 Messungen.</p>
+        <p>Oben steht deine letzte Messung mit Ampel-Farbe und Ampel-Wort (beim Gewicht nur die Zahl).</p>
+        <p>Darunter siehst du für Blutdruck, Puls, Temperatur, Sauerstoff und Gewicht den Durchschnitt der letzten 7 Tage, ebenfalls mit Ampel-Farbe (bei Puls und Gewicht ohne). Einen Durchschnitt gibt es erst ab 3 Messungen.</p>
         <p>Wie sich deine Werte über die Zeit entwickeln, zeigt der Tab „Diagramm“.</p>
       </div>
     </div>
@@ -539,6 +546,7 @@
         <p>Grün heißt: im Zielbereich. Gelb: etwas außerhalb. Rot: deutlich außerhalb. Dazu steht immer ein Wort, z. B. „Erhöht“ oder „Fieber“.</p>
         <p class="hlp-pt">Temperatur: Gelb gibt es in beide Richtungen, „Niedrig“ und „Erhöht“.</p>
         <p class="hlp-pt">Sauerstoff: Hier sind die niedrigen Werte gelb oder rot.</p>
+        <p class="hlp-pt">Gewicht: Hier gibt es keine Ampel, nur die Zahl.</p>
         <p>Ab wann welche Farbe gilt, stellst du unter Menü → „Zielbereich“ ein. Die Standardwerte sind gängige Richtwerte.</p>
       </div>
     </div>
@@ -549,9 +557,9 @@
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="hlp-body" id="hlp5" hidden>
-        <p>Blutdruck, Temperatur oder Sauerstoff wählst du oben oder durch Wischen nach links und rechts. Unten stellst du den Zeitraum ein: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
+        <p>Blutdruck, Temperatur, Sauerstoff oder Gewicht wählst du oben oder durch Wischen nach links und rechts. Unten stellst du den Zeitraum ein: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
         <p class="hlp-pt">Verlauf: alle Messungen, neueste zuerst. Tippe eine an, um sie anzusehen, zu bearbeiten oder zu löschen.</p>
-        <p class="hlp-pt">Diagramm: deine Werte über die Zeit. Die Punkte haben die Ampel-Farbe, die gestrichelte Linie ist der Durchschnitt. Beim Blutdruck schaltest du zwischen Sys, Dia und Beide um und blendest den Puls ein.</p>
+        <p class="hlp-pt">Diagramm: deine Werte über die Zeit. Die Punkte haben die Ampel-Farbe (beim Gewicht sind sie einfarbig), die gestrichelte Linie ist der Durchschnitt. Beim Blutdruck schaltest du zwischen Sys, Dia und Beide um und blendest den Puls ein.</p>
       </div>
     </div>
     <div class="hlp">
@@ -571,7 +579,7 @@
         <p>Oben im Backup siehst du, ob es ungesicherte Änderungen gibt. Nach der eingestellten Zahl an Tagen erinnert dich die App.</p>
         <div class="hlp-box hlp-warn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg>
-          <span><b>Achtung Android:</b> Nutzt du noch die alte Blutdruck-App, verknüpfe beim automatischen Backup nie dieselbe Datei in beiden Apps. Die alte App kennt Temperatur und Sauerstoff nicht und würde die Datei ohne diese Werte überschreiben.</span>
+          <span><b>Achtung Android:</b> Nutzt du noch die alte Blutdruck-App, verknüpfe beim automatischen Backup nie dieselbe Datei in beiden Apps. Die alte App kennt Temperatur, Sauerstoff und Gewicht nicht und würde die Datei ohne diese Werte überschreiben.</span>
         </div>
       </div>
     </div>
@@ -596,7 +604,7 @@
       <div class="hlp-body" id="hlp8" hidden>
         <p class="hlp-pt">„Als CSV exportieren“ macht eine Tabelle für Excel.</p>
         <p class="hlp-pt">„Arzt-Report“ bereitet deine Werte zum Drucken oder als PDF auf.</p>
-        <p class="hlp-pt">„Alle Daten löschen“ löscht Blutdruck, Temperatur und Sauerstoff. Vorher fragt die App nach. Eine Backup-Datei bleibt erhalten.</p>
+        <p class="hlp-pt">„Alle Daten löschen“ löscht Blutdruck, Temperatur, Sauerstoff und Gewicht. Vorher fragt die App nach. Eine Backup-Datei bleibt erhalten.</p>
         <p>Darunter steht, wie viel Speicher belegt ist.</p>
       </div>
     </div>

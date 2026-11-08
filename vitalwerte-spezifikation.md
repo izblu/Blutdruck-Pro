@@ -1,8 +1,8 @@
 # Vitalwerte – Datenspezifikation
 
 Stand: 2026-11-04, ergänzt 2026-11-07 (Ziffern-Logik, Dashboard, Zielbereich, großes +), am 2026-11-08 mit dem
-fertigen Code abgeglichen (Umbau Schritte 1–10 erledigt). Diese Datei beschreibt **was** die App bei Körpertemperatur und
-Sauerstoffsättigung (SpO₂) rechnet, speichert und anzeigt – nicht wie es aussieht. Gleiche
+fertigen Code abgeglichen (Umbau Schritte 1–10 erledigt), seit 2026-11-08 auch mit dem **Körpergewicht**. Diese Datei beschreibt **was** die App bei
+Körpertemperatur, Sauerstoffsättigung (SpO₂) und Körpergewicht rechnet, speichert und anzeigt – nicht wie es aussieht. Gleiche
 Aufteilung wie die [dashboard-spezifikation.md](dashboard-spezifikation.md):
 
 - **Fix (Logik/Daten):** Datenmodell, Eingabe-Regeln, Berechnung, Zeitfenster, Ampel-Regeln,
@@ -22,7 +22,7 @@ keine Empfehlungen.
   `mergeEntriesFromData` übernimmt nur Einträge mit `sys`, `dia` und `pulse`. Bleibt `entries`
   unverändert, kann auch die alte App ein Pro-Backup lesen.
 - **Ein Datensatz, ein Wert:**
-  `{id, ts, type:'temp'|'spo2', value, note}`. `value` ist immer eine Zahl (`36.8`, nie `"36,8"`).
+  `{id, ts, type:'temp'|'spo2'|'weight', value, note}`. `value` ist immer eine Zahl (`36.8`, nie `"36,8"`).
 - **Speicher:** eigener Bereich der Browser-Datenbank (IndexedDB-Store `vitals`), dafür steigt
   `DB_VER` auf 2. Vorhandene Daten bleiben beim Umstieg erhalten. Kopie in `localStorage` unter
   `bpp_vitals`, Ablauf wie bei `entries` (`saveEntries`, `initStorage`).
@@ -30,7 +30,7 @@ keine Empfehlungen.
   den Trend entfällt, siehe Abschnitt 3.)
 - **Durchschnitt** = einfacher Mittelwert über alle Werte im Fenster (nicht pro Tag gewichtet).
 - **Rundung und Anzeige:** Temperatur immer mit einer Nachkommastelle und Komma (`36,8 °C`, auch
-  `37,0 °C`), Sauerstoff als ganze Zahl (`98 %`).
+  `37,0 °C`), Gewicht ebenso (`82,5 kg`, auch `82,0 kg`), Sauerstoff als ganze Zahl (`98 %`).
 
 ### Verzeichnis `METRICS`
 
@@ -40,26 +40,28 @@ Alle festen Angaben stehen an einer Stelle:
 |---|---|---|---|---|
 | `temp` | Körpertemperatur | °C | 1 | 34–43 |
 | `spo2` | Sauerstoffsättigung (SpO₂) | % | 0 | 70–100 |
+| `weight` | Körpergewicht | kg | 1 | 30–250 |
 
 ---
 
 ## 1. Eingabe
 
 Ziffernblock, Datums-Blatt, Notiz-Blatt und Speichern-Häkchen sind dieselben wie beim Blutdruck.
-Temperatur und Sauerstoff haben je **ein Feld**. Gespeichert wird immer erst per Knopf, nie automatisch.
+Temperatur, Sauerstoff und Gewicht haben je **ein Feld**. Gespeichert wird immer erst per Knopf, nie automatisch.
 
-| | Temperatur | Sauerstoff |
-|---|---|---|
-| Ziffern | genau 3, das Komma setzt die App | 2 oder 3 |
-| Speichern möglich | ab 3 Ziffern | ab 2 Ziffern und höchstens 100 |
-| Beispiele | `368` → 36,8 · `370` → 37,0 | `98` → 98 · `100` → 100 · `101` gesperrt |
+| | Temperatur | Sauerstoff | Gewicht |
+|---|---|---|---|
+| Ziffern | genau 3, das Komma setzt die App | 2 oder 3 | 3 oder 4, das Komma setzt die App |
+| Speichern möglich | ab 3 Ziffern | ab 2 Ziffern und höchstens 100 | sobald vollständig |
+| Beispiele | `368` → 36,8 · `370` → 37,0 | `98` → 98 · `100` → 100 · `101` gesperrt | `825` → 82,5 · `1025` → 102,5 |
 
 - **Prüf-Hinweis** wie beim Blutdruck („Ungewöhnlicher Wert – bitte prüfen."), wenn der Wert außerhalb
   des plausiblen Bereichs liegt. Er erscheint erst, wenn der Wert vollständig ist, und verhindert das
   Speichern nicht.
 - **Einzige Sperre:** Sauerstoff über 100 % ist unmöglich und lässt sich nicht speichern.
 - **Bearbeiten:** Der Wert wird wieder in Ziffern zerlegt. Vorsicht: `String(37.0)` ergibt `"37"`.
-  Deshalb über `Math.round(value*10)` gehen, sonst wird aus 37,0 beim Bearbeiten etwas Falsches.
+  Deshalb über `Math.round(value*10)` gehen, sonst wird aus 37,0 beim Bearbeiten etwas Falsches. Dasselbe gilt fürs
+  Gewicht (82,0 bleibt 82,0).
 - **Der Typ lässt sich nicht ändern:** Eine Temperatur bleibt beim Bearbeiten eine Temperatur.
 
 ### 1.1 Ziffern-Logik (alle Werte, auch Blutdruck)
@@ -74,11 +76,13 @@ oder drei Stellen hat, und springt danach von selbst zum nächsten Feld.
 | Puls | 1 ist (100–199) | zwei Stellen | 35–200 |
 | Sauerstoff | 1 ist (100) | zwei Stellen | 70–100 (über 100 gesperrt) |
 | Temperatur | immer drei Stellen | – | 34–43 |
+| Gewicht | 1 oder 2 ist: **vier** Stellen (100,0–299,9) | drei Stellen (30,0–99,9) | 30–250 |
 
 - **0 als erste Ziffer wird ignoriert.** Mehr Ziffern als vorgesehen lassen sich nicht eintippen.
 - **Vollständig → automatisch weiter** zum nächsten Feld. Beim letzten Feld bleibt die Eingabe stehen, gespeichert wird
   nur per Knopf.
-- **Ampel erst bei vollständigem Wert.** Vorher (z. B. bei „1") steht weder Farbe noch Ampel-Wort da.
+- **Ampel erst bei vollständigem Wert.** Vorher (z. B. bei „1") steht weder Farbe noch Ampel-Wort da. Das Gewicht hat keine Ampel.
+- **Komma in der Anzeige** (Temperatur und Gewicht): steht vor der letzten Ziffer, sobald nur noch sie fehlt („82," und „102,").
 - **Der Prüf-Hinweis sperrt nichts** (einzige Sperre bleibt Sauerstoff über 100 %).
 - Gilt auch für den bisherigen Blutdruck: `capPressDigit` sprang früher erst nach drei Ziffern weiter.
 - **Überspringen** führt auf jedem Feld außer dem letzten genau ein Feld nach rechts, auch über Pflichtfelder hinweg.
@@ -137,6 +141,9 @@ Sauerstoff-Stufen stammen aus Gesundheitsratgebern. Für die Fieber-Grenzen wurd
 Leitlinie gefunden. Deshalb sind sie änderbar, was z. B. bei Lungenerkrankungen mit anderem Zielbereich
 wichtig ist. Der Nutzer will sie mit seiner Ärztin oder seinem Arzt besprechen.
 
+**Gewicht: keine Ampel** (Entscheidung des Nutzers 2026-11-08, wie beim Puls). Nur die Zahl in normaler Schriftfarbe, kein
+Punkt, kein Wort, kein Eintrag unter „Zielbereich" (`hasAmpel`). Es bleibt bei **neun Grenzen**.
+
 **Bewusst einfach:** Nach unten gibt es bei der Temperatur keine rote Stufe. Auch sehr niedrige Werte
 bleiben gelb „Niedrig", unter 34 kommt der Prüf-Hinweis dazu.
 
@@ -148,12 +155,13 @@ Neu aufgebaut („Letzte Messung + 7 Tage", Entwurf vom 2026-11-06, Nutzer: „e
 selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikation.md). Der Ampel-Ring entfällt.
 
 ### 3.1 Kennzahlen je Wert
-- **Letzte Messung:** eigene Karte je Wert (Blutdruck + Puls · Temperatur · Sauerstoff). Zahl mit Einheit in
+- **Letzte Messung:** eigene Karte je Wert (Blutdruck + Puls · Temperatur · Sauerstoff · Gewicht). Zahl mit Einheit in
   Ampelfarbe, Ampel-Punkt und Ampel-Wort, Zeitpunkt relativ (`relTime`). Puls in Puls-Farbe ohne Ampel, „–" wenn
-  die Messung keinen Puls hat.
+  die Messung keinen Puls hat. Gewicht in normaler Schriftfarbe ohne Ampel, auf einer Karte über die ganze Breite unter
+  Temperatur und Sauerstoff.
 - **Ø 7 Tage** (rollierend, 168 h, fest): Temperatur auf eine Nachkommastelle, Sauerstoff ganzzahlig. **Erst ab 3
   Messungen** (`DASH_MIN`). Der Ø trägt Ampelfarbe und Ampel-Wort (`catMetric` auf dem gerundeten Ø; Blutdruck
-  `category()` auf den gerundeten Ø-Werten). Puls: Ø ohne Ampel, eigene Zählung (Messungen ohne Puls zählen nicht).
+  `category()` auf den gerundeten Ø-Werten). Puls: Ø ohne Ampel, eigene Zählung (Messungen ohne Puls zählen nicht). Gewicht: Ø auf eine Nachkommastelle, ohne Ampel.
 - **Kein Trend, keine Anzahl „im Ziel", keine Grafik** (Verläufe gehören in den Tab „Diagramm").
 - **Antippen:** Karte „Letzte Messung" → Detail dieser Messung; Karte „Letzte 7 Tage" → Diagramm mit diesem Wert,
   Zeitraum 7 Tage.
@@ -170,13 +178,13 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 
 ## 4. Verlauf und Diagramm
 
-- **Gemeinsamer Umschalter** Blutdruck · Temperatur · Sauerstoff. Er gilt für beide Ansichten, ist
+- **Gemeinsamer Umschalter** Blutdruck · Temperatur · Sauerstoff · Gewicht. Er gilt für beide Ansichten, ist
   flüchtig (nicht in `settings`, nicht im Backup) und startet bei Blutdruck.
 - **Gemeinsamer Zeitraum** wie bisher (`verlaufRange`, `applyVerlaufRange`, `filters.from/to`), Standard 30 Tage.
   Die übrigen Felder in `filters` (`sysMin` usw.) gelten für die neuen Werte nicht.
 
 ### 4.1 Verlauf
-- Neueste zuerst. Zeile: Datum, Uhrzeit, Wert in Ampelfarbe, Notiz-Zeichen. Tippen öffnet das Detail.
+- Neueste zuerst. Zeile: Datum, Uhrzeit, Wert in Ampelfarbe (Gewicht ohne Ampel und ohne Punkt), Notiz-Zeichen. Tippen öffnet das Detail.
 - Kopfzeile: Zeitraum und Anzahl.
 - **Leer:** kein Wert dieses Typs → „noch kein Wert erfasst"; im Zeitraum leer → „keine Werte in diesem Zeitraum".
 
@@ -184,7 +192,8 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 - **Eigene Grafik, zeitgetreue Achse** (Berechnung aus `rpChart`). Ein einzelner Wert steht in der Mitte.
   `buildDiagChart` bleibt unberührt.
 - **Inhalt:** Verbindungslinie, Punkte in Ampelfarbe (`catMetric`), gestrichelte Ø-Linie über den Zeitraum,
-  keine Schwellen-Linien. Kopf: Ø mit Ampel-Text, Zeitraum, Anzahl.
+  keine Schwellen-Linien. Kopf: Ø mit Ampel-Text, Zeitraum, Anzahl. Gewicht: Punkte in Akzentfarbe, kein Ampel-Text, keine
+  Zählung je Ampel-Wort.
 - **Knöpfe Sys/Dia/Beide/Puls** werden ausgeblendet.
 - **Höhen-Achse:** Sie umschließt immer alle Werte. Damit kleine Schwankungen nicht dramatisch wirken, gilt
   eine Mindest-Spanne:
@@ -193,6 +202,9 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
   |---|---|---|---|
   | Temperatur | kleinster Wert − 0,3, abgerundet auf ganze Grad | größter Wert + 0,3, aufgerundet auf ganze Grad | 2 °C |
   | Sauerstoff | kleinster Wert − 2, abgerundet auf 5er-Schritte | immer 100 | 10 % |
+  | Gewicht | kleinster Wert − 0,5, abgerundet (auf den Schritt) | größter Wert + 0,5, aufgerundet (auf den Schritt) | 4 kg |
+
+  Beim Gewicht richtet sich der Schritt nach der Spanne (1, 2, 5, 10, 20 oder 50 kg), damit höchstens sechs Abschnitte entstehen.
 - **Leer:** „Noch keine Daten im gewählten Zeitraum." wie bisher.
 
 ---
@@ -203,6 +215,7 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 - **Position auf der Ampel-Skala:** Bereich Temperatur 34–42, Sauerstoff 85–100, in den Grenzen aus `settings.thr`.
   Die vorhandene Hilfsfunktion `grad` reicht nicht: Die Temperatur hat Gelb auf beiden Seiten, beim Sauerstoff
   ist die Reihenfolge umgedreht.
+- **Gewicht:** nur die Zahl, keine Ampel-Pille und keine Ampel-Skala.
 - **Bearbeiten und Löschen** wie beim Blutdruck (`startCapture`, `askConfirm` mit Vorschau).
 - **Nur beim Sauerstoff:** sachlicher Hinweis, dass kalte Finger, Nagellack oder Bewegung den Wert verfälschen können.
 
@@ -221,6 +234,7 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 ### 6.2 Zusammenführen (`mergeEntriesFromData`)
 - Führt `entries` und `vitals` zusammen. Die Statistik „X neu, Y aktualisiert" zählt beide.
 - Akzeptiert auch Backups ohne Blutdruck-Werte. Ungültig ist eine Datei erst, wenn **beide** Listen keinen gültigen Eintrag haben.
+- **Format und Browser-Datenbank bleiben beim Gewicht unverändert** (Version 3, `DB_VER` 2): Es steht mit `type:'weight'` in `vitals`.
 - **Gültiger Vitalwert:** bekannter `type`, Zahl als `value`, lesbares `ts`, beim Sauerstoff höchstens 100. Ungültige
   Einträge werden übersprungen.
 - **Grenzen beim Übernehmen der Einstellungen:** `applyBackupSettings` führt sie zusammen (Standard ← aktuelle Werte ←
@@ -234,15 +248,15 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 |---|---|
 | Alte App → Pro | Alles kommt an |
 | Pro → Pro | Alles kommt an |
-| Pro → alte App | Blutdruck und Einstellungen kommen an, Temperatur und Sauerstoff werden ignoriert |
+| Pro → alte App | Blutdruck und Einstellungen kommen an, Temperatur, Sauerstoff und Gewicht werden ignoriert |
 | Pro-Backup nur mit neuen Werten → alte App | Meldung „ungültige Datei", nichts geht kaputt |
 
 **Achtung Android:** Beim automatischen Backup nie dieselbe Datei in beiden Apps verknüpfen. Die alte App würde
-sie sonst ohne Temperatur und Sauerstoff überschreiben. Dieser Hinweis steht an **zwei** Stellen (Wunsch des Nutzers;
+sie sonst ohne Temperatur, Sauerstoff und Gewicht überschreiben. Dieser Hinweis steht an **zwei** Stellen (Wunsch des Nutzers;
 ursprünglich war nur die Anleitung geplant):
 
 - **Menü → Backup**, Karte „Automatisches Backup": gelbes Warn-Dreieck mit „Diese Datei nie zusätzlich in der alten
-  Blutdruck-App verknüpfen. Sie würde die Datei ohne Temperatur und Sauerstoff überschreiben." Sichtbar, **sobald das
+  Blutdruck-App verknüpfen. Sie würde die Datei ohne Temperatur, Sauerstoff und Gewicht überschreiben." Sichtbar, **sobald das
   automatische Backup verfügbar ist** (`FS_SUPPORTED`), verknüpft oder nicht, also auch schon beim Verknüpfen. Auf
   dem iPhone gibt es das automatische Backup nicht, die Karte bleibt ausgegraut und ohne Warnung.
 - **Anleitung**, Thema „Backup: nichts verlieren": gelber Kasten „Achtung Android".
@@ -257,10 +271,10 @@ sicher vor Verlust sind.
 
 ## 7. CSV
 
-- Spalten: `Datum; Uhrzeit; Systolisch; Diastolisch; Puls; Temperatur (°C); SpO2 (%); Notiz`.
+- Spalten: `Datum; Uhrzeit; Systolisch; Diastolisch; Puls; Temperatur (°C); SpO2 (%); Gewicht (kg); Notiz`.
 - Eine Zeile je Datensatz, nach Zeit sortiert. Spalten anderer Werte bleiben leer. Es wird nichts anhand gleicher
   Uhrzeiten zusammengelegt.
-- Temperatur mit Dezimalkomma und immer einer Nachkommastelle (`36,8`, `37,0`) für das deutsche Excel.
+- Temperatur und Gewicht mit Dezimalkomma und immer einer Nachkommastelle (`36,8`, `37,0`, `82,5`) für das deutsche Excel.
 
 ---
 
@@ -271,6 +285,8 @@ und 10). Kurz:
 
 - **Schalter „Temperatur & Sauerstoff einbeziehen":** Standard **an**, flüchtig wie der übrige `reportState`. Die
   Unterzeile zählt die Werte im Zeitraum; ohne Werte entfällt die Seite („Keine Werte im Zeitraum").
+- **Schalter „Gewicht einbeziehen":** eigener Schalter, Standard **an**. Das Gewicht steht auf derselben Seite wie
+  Temperatur und Sauerstoff. Ohne Gewicht im Zeitraum sieht der Bericht aus wie bisher.
 - **Eigene A4-Seite** (Seite 2): je Wert Ø mit Ampel-Wort, Tiefst–Höchst, Anzahl und Verlauf, dazu die Werteliste und
   die angewendeten Grenzen. Fehlt ein Wert im Zeitraum, steht dort „Keine Werte im Zeitraum." bzw. „—" in der Tabelle.
 - **Anhang im Querformat** für Temperatur & Sauerstoff (beide auf einer Seite), zusammen mit dem Blutdruck-Anhang über
@@ -292,9 +308,9 @@ Schlüssel nicht und übernimmt ihn einfach nicht.
 
 | | Name im Menü | Satz im Menü | Ablauf |
 |---|---|---|---|
-| A | Erst wählen | „Nach dem + wählst du, was du misst." | Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff, danach die Eingabe |
-| B | Direkt starten | „Startet mit Blutdruck. Oben wechselst du den Wert." | Eingabe Blutdruck, oben ein Umschalter zu Temperatur und Sauerstoff, zusätzlich per Wischen |
-| C | Alles nacheinander | „Alle Werte in einem Durchgang. Was fehlt, überspringst du." + Pille „Standard" | Sys → Dia → Puls → Temperatur → Sauerstoff, was fehlt, wird übersprungen |
+| A | Erst wählen | „Nach dem + wählst du, was du misst." | Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff · Gewicht, danach die Eingabe |
+| B | Direkt starten | „Startet mit Blutdruck. Oben wechselst du den Wert." | Eingabe Blutdruck, oben ein Umschalter zu Temperatur, Sauerstoff und Gewicht, zusätzlich per Wischen |
+| C | Alles nacheinander | „Alle Werte in einem Durchgang. Was fehlt, überspringst du." + Pille „Standard" | Sys → Dia → Puls → Temperatur → Sauerstoff → Gewicht, was fehlt, wird übersprungen |
 
 Jede Wahlzeile zeigt ein kleines Bild des Bildschirms, Name, Satz und rechts den Häkchen-Kreis. Das große + ruft
 `openPlus()` auf, das nach `plusModeNow()` verzweigt. Die Anleitung erklärt die drei Wege im Thema „Plus-Button".
@@ -331,7 +347,7 @@ Checkliste für den Umbau, **alle Punkte umgesetzt**. Bleibt als Nachschlage-Lis
 ## 11. Bewusst nicht enthalten
 
 Messort bei der Temperatur · Puls beim Sauerstoff · Apple Health und Bluetooth (auf dem iPhone nur mit nativer App möglich) ·
-Fahrenheit · gemeinsames Diagramm aller Werte.
+Fahrenheit · gemeinsames Diagramm aller Werte · beim Gewicht: Zielgewicht, BMI, Körpergröße, Pfund/lbs, Trend.
 
 ---
 
