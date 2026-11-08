@@ -36,6 +36,13 @@
   --primary:var(--accent); --primary-ink:var(--accent-ink);
   --accent-soft:color-mix(in srgb,var(--accent) 13%,transparent);
   --scrim:rgba(15,23,42,.62);
+  --dlg-backdrop:rgba(15,23,42,.55);
+  /* Knöpfe und offener Menü-Abschnitt: im Hellen wie gehabt, im Dunklen eigene Werte (siehe unten).
+     --btn liegt auf Innenkarten, --chip auf Karten und Leisten. */
+  --btn:var(--surf); --btn-bd:var(--line); --chip:var(--surf2);
+  --open-bg:var(--surf); --open-bd:var(--line); --open-bw:1px; --open-head:transparent; --open-gap:0px;
+  --open-ic-bg:var(--accent-soft); --open-ic:var(--accent); --open-s:var(--muted); --open-chev:var(--muted);
+  --open-sh:0 12px 26px -14px rgba(20,30,50,.34);
   --cat-g:var(--g-bar); --cat-y:var(--y-bar); --cat-r:var(--r-bar);
   --danger:var(--r-bar);
   --c-sys:var(--r-bar); --c-dia:var(--accent); --c-pulse:var(--pulse-bar);
@@ -43,7 +50,10 @@
 /* Dunkel: einmal automatisch (Systemeinstellung), einmal fest gewählt. Gleiche Werte. */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0e131c; --surf:#171e2a; --surf2:#1f2836; --ink:#eef2f8; --muted:#97a1b3; --line:#2b3543;
+    --bg:#0a0e15; --surf:#1f2938; --surf2:#0f151f; --ink:#eef2f8; --muted:#aeb8c9; --line:#46546b;
+    --btn:#2f3c52; --btn-bd:#5f6f8a; --chip:#2f3c52; --dlg-backdrop:rgba(0,0,0,.72);
+    --open-bg:#263244; --open-bd:var(--accent); --open-bw:2px; --open-head:color-mix(in srgb,var(--accent) 24%,#263244); --open-gap:12px;
+    --open-ic-bg:var(--accent); --open-ic:var(--bg); --open-s:#d5dcea; --open-chev:var(--ink); --open-sh:0 16px 30px -12px #000;
     --accent:#5b8cf5; --accent-ink:#ffffff;
     --g-ink:#4ade80; --g-soft:rgba(34,197,94,.15); --g-bar:#22c55e;
     --y-ink:#fbbf24; --y-soft:rgba(234,179,8,.15); --y-bar:#eab308;
@@ -54,7 +64,10 @@
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0e131c; --surf:#171e2a; --surf2:#1f2836; --ink:#eef2f8; --muted:#97a1b3; --line:#2b3543;
+  --bg:#0a0e15; --surf:#1f2938; --surf2:#0f151f; --ink:#eef2f8; --muted:#aeb8c9; --line:#46546b;
+  --btn:#2f3c52; --btn-bd:#5f6f8a; --chip:#2f3c52; --dlg-backdrop:rgba(0,0,0,.72);
+  --open-bg:#263244; --open-bd:var(--accent); --open-bw:2px; --open-head:color-mix(in srgb,var(--accent) 24%,#263244); --open-gap:12px;
+  --open-ic-bg:var(--accent); --open-ic:var(--bg); --open-s:#d5dcea; --open-chev:var(--ink); --open-sh:0 16px 30px -12px #000;
   --accent:#5b8cf5; --accent-ink:#ffffff;
   --g-ink:#4ade80; --g-soft:rgba(34,197,94,.15); --g-bar:#22c55e;
   --y-ink:#fbbf24; --y-soft:rgba(234,179,8,.15); --y-bar:#eab308;
@@ -134,7 +147,7 @@ dialog{
 dialog[open]{display:flex;flex-direction:column}
 /* Menü & Anleitung heben sich farblich von der App ab und lassen ringsum Rand zum Raustippen */
 #menuDlg,#helpDlg{background:var(--bg);box-shadow:0 -8px 44px rgba(12,18,30,.4);border:1px solid var(--line);border-radius:26px;margin-top:auto;margin-bottom:calc(12px + env(safe-area-inset-bottom))}
-dialog::backdrop{background:rgba(15,23,42,.55)}
+dialog::backdrop{background:var(--dlg-backdrop,rgba(15,23,42,.55))}   /* Rückfallwert für ältere Browser ohne Variablen an ::backdrop */
 /* Menü & Anleitung gleiten beim Öffnen als Bottom-Sheet hoch, der Hintergrund blendet ein
    (automatisch aus, wenn das Gerät „Bewegung reduzieren" verlangt) */
 @media (prefers-reduced-motion:no-preference){
@@ -186,7 +199,12 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 #menuDlg .dlg-head{padding:4px 18px 2px;font-size:19px;font-weight:800;letter-spacing:-.01em}
 #menuDlg .dlg-body{padding:12px 16px 16px;display:flex;flex-direction:column;gap:9px;scrollbar-width:none}
 .acc-sec{background:var(--surf);border:1px solid var(--line);border-radius:18px;transition:box-shadow .3s}
-.acc-sec.open{box-shadow:0 12px 26px -14px rgba(20,30,50,.34)}
+.acc-sec.open{background:var(--open-bg);border:var(--open-bw) solid var(--open-bd);box-shadow:var(--open-sh)}
+/* Dunkel: Rahmen und Kopfband in der Akzentfarbe zeigen, was offen ist (im Hellen wirkungslos, die Werte sind dort die normalen) */
+.acc-sec.open .acc-head{background:var(--open-head);border-radius:15px 15px 0 0;margin-bottom:var(--open-gap)}
+.acc-sec.open .acc-ic{background:var(--open-ic-bg);color:var(--open-ic)}
+.acc-sec.open .acc-s{color:var(--open-s)}
+.acc-sec.open .chev{color:var(--open-chev)}
 .acc-head{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;text-align:left;background:none;border:none;color:var(--ink);padding:10px 12px 10px 13px;font:inherit;cursor:pointer}
 .acc-link{background:var(--surf);border:1px solid var(--line);border-radius:18px}
 .acc-ic{width:36px;height:36px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
@@ -209,7 +227,7 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .grp-head,.mblk-t{font-size:13.5px;font-weight:800;color:var(--ink);margin:0 0 9px}
 /* Knöpfe in den Innenkarten */
 .lf-actions{display:flex;gap:8px}
-.lf-btn{flex:1;min-height:46px;white-space:nowrap;text-align:center;padding:0 6px;border:1px solid var(--line);border-radius:11px;background:var(--surf);color:var(--ink);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.lf-btn{flex:1;min-height:46px;white-space:nowrap;text-align:center;padding:0 6px;border:1px solid var(--btn-bd);border-radius:11px;background:var(--btn);color:var(--ink);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
 .lf-btn:disabled{opacity:.6;cursor:default}
 #linkFileName{margin:0 0 9px;overflow-wrap:anywhere}
 .is-linked{color:var(--g-ink)}
@@ -240,7 +258,7 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .bk-rem-l{font-size:13.5px;font-weight:700}
 .stepper{display:flex;align-items:center}
 .step-btn{width:44px;height:46px;padding:0;border:0;background:transparent;display:grid;place-items:center;color:var(--ink);cursor:pointer}
-.step-btn>span{width:32px;height:32px;border-radius:50%;box-sizing:border-box;background:var(--surf);border:1px solid var(--line);display:grid;place-items:center}
+.step-btn>span{width:32px;height:32px;border-radius:50%;box-sizing:border-box;background:var(--btn);border:1px solid var(--btn-bd);display:grid;place-items:center}
 .step-btn svg{width:14px;height:14px}
 .step-btn[aria-disabled="true"]{opacity:.35;cursor:default}
 .step-val{min-width:92px;text-align:center;font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -261,7 +279,7 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .thr-chips{position:relative;height:44px}
 .thr-lab{position:absolute;top:0;width:52px;height:44px;display:flex;flex-direction:column;align-items:center;cursor:text}
 .thr-lab::before{content:"";flex:0 0 auto;width:1.5px;height:5px;background:var(--muted);opacity:.6}
-.thr-in{flex:0 0 auto;width:52px;height:34px;box-sizing:border-box;margin:0;padding:0;border-radius:10px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font:inherit;font-size:14px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;-webkit-appearance:none;appearance:none;outline:none}
+.thr-in{flex:0 0 auto;width:52px;height:34px;box-sizing:border-box;margin:0;padding:0;border-radius:10px;border:1px solid var(--btn-bd);background:var(--btn);color:var(--ink);font:inherit;font-size:14px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;-webkit-appearance:none;appearance:none;outline:none}
 .thr-in:focus{box-shadow:0 0 0 2px var(--accent)}
 .thr-in.bad{border:2px solid var(--r-bar);background:var(--r-soft);color:var(--r-ink)}
 .thr-err{display:flex;align-items:flex-start;gap:6px;margin:1px 0 2px;font-size:12px;font-weight:700;line-height:1.35;color:var(--r-ink)}
@@ -284,7 +302,7 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 
 /* Neue Messung (Plus-Button): drei Wahlzeilen mit Mini-Bild, gilt sofort beim Antippen */
 .plus-pick{display:flex;flex-direction:column;gap:7px}
-.pp-opt{width:100%;min-height:64px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:8px 10px;border:2px solid var(--line);border-radius:13px;background:var(--surf);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.pp-opt{width:100%;min-height:64px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:8px 10px;border:2px solid var(--line);border-radius:13px;background:var(--btn);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
 .pp-opt[aria-pressed="true"]{border-color:var(--accent)}
 .pp-mini{width:36px;height:49px;flex:0 0 auto}
 .pp-mini text{font-family:inherit}
@@ -298,7 +316,7 @@ dialog::backdrop{background:rgba(15,23,42,.55)}
 .pp-opt[aria-pressed="true"] .pp-ck svg{opacity:1}
 
 /* Daten: Export-Zeilen + Lösch-Knopf */
-.m-row{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;box-sizing:border-box;text-align:left;background:var(--surf);border:1px solid var(--line);border-radius:11px;padding:0 12px;color:var(--ink);font:inherit;cursor:pointer}
+.m-row{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;box-sizing:border-box;text-align:left;background:var(--btn);border:1px solid var(--btn-bd);border-radius:11px;padding:0 12px;color:var(--ink);font:inherit;cursor:pointer}
 .m-row-ic{color:var(--accent);display:grid;place-items:center;flex:0 0 auto}
 .m-row-ic svg{width:20px;height:20px}
 .m-row-t{flex:1;font-size:13.5px;font-weight:700}
@@ -518,7 +536,7 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 .cap-date.past{background:color-mix(in srgb,var(--accent) 18%,var(--surf));border-color:var(--accent)}
 .cap-date-ic{color:var(--accent);display:grid;place-items:center}
 .cap-date-ic svg{width:15px;height:15px;display:block}
-.cap-x{width:34px;height:34px;flex:none;border:none;border-radius:50%;background:var(--surf2);color:var(--muted);display:grid;place-items:center}
+.cap-x{width:34px;height:34px;flex:none;border:none;border-radius:50%;background:var(--chip);color:var(--muted);display:grid;place-items:center}
 .cap-x svg{width:18px;height:18px}
 
 .cap-mid{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px 18px 0;overflow:hidden}
@@ -569,7 +587,7 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 .cap-key{height:46px;border:none;border-radius:10px;background:var(--surf);color:var(--ink);display:grid;place-items:center;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;box-shadow:0 1px 1.5px rgba(20,30,50,.16);transition:transform .11s ease}
 .cap-key:active{transform:scale(.94)}
 .cap-key-sp{height:46px}
-.cap-key-bk{background:var(--surf2)}
+.cap-key-bk{background:var(--chip)}
 .cap-key-bk svg{width:26px;height:26px}
 
 /* Kacheln sind jetzt Knöpfe (von app.js je Feldliste gebaut) – Knopf-Standardoptik zurücksetzen */
@@ -814,7 +832,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
    Erhöhte Leiste mit weicher Ober-Kante; Icon-Knöpfe 50x50, Primär gefüllt in Akzent. */
 .det-actions{flex:none;display:flex;align-items:center;gap:10px;padding:12px 16px calc(20px + env(safe-area-inset-bottom));background:var(--surf);border-top:1px solid var(--line);box-shadow:0 -10px 24px -18px rgba(18,28,48,.55)}
 .det-nav,.det-del{width:50px;height:50px;flex:none;border:none;border-radius:15px;display:grid;place-items:center;cursor:pointer;transition:transform .12s ease,background .15s ease}
-.det-nav{background:var(--surf2);color:var(--ink)}
+.det-nav{background:var(--chip);color:var(--ink)}
 .det-nav svg{width:22px;height:22px}
 .det-del{background:var(--r-soft);color:var(--r-ink)}
 .det-del svg{width:20px;height:20px}
@@ -824,7 +842,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .det-del:active{transform:scale(.93)}
 .det-primary:active{transform:scale(.97)}
 @media(hover:hover){
-  .det-nav:hover{background:color-mix(in srgb,var(--ink) 6%,var(--surf2))}
+  .det-nav:hover{background:color-mix(in srgb,var(--ink) 6%,var(--chip))}
   .det-primary:hover{background:color-mix(in srgb,#000 6%,var(--accent))}
   .det-del:hover{background:color-mix(in srgb,var(--r-ink) 8%,var(--r-soft))}
 }
@@ -882,15 +900,15 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .dg-seg{flex:1;display:flex;background:var(--surf2);border-radius:999px;padding:3px}
 .dg-seg-btn{flex:1;text-align:center;padding:7px 4px;border:none;background:none;border-radius:999px;font-family:inherit;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:background-color .2s ease,color .2s ease}
 .dg-seg-btn.active{color:var(--accent);background:var(--surf);box-shadow:0 1px 2px rgba(20,30,50,.12)}
-.dg-pulse{flex:none;display:inline-flex;align-items:center;gap:6px;padding:6px 12px 6px 9px;border:none;border-radius:999px;background:var(--surf2);color:var(--muted);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:background-color .2s ease,color .2s ease}
+.dg-pulse{flex:none;display:inline-flex;align-items:center;gap:6px;padding:6px 12px 6px 9px;border:none;border-radius:999px;background:var(--chip);color:var(--muted);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:background-color .2s ease,color .2s ease}
 .dg-pulse svg{width:16px;height:16px}
 .dg-pulse.active{background:var(--pulse-soft);color:var(--pulse-ink)}
-.dg-cal{flex:none;width:40px;height:38px;display:grid;place-items:center;border:none;border-radius:999px;background:var(--surf2);color:var(--muted);cursor:pointer;transition:background-color .2s ease,color .2s ease}
+.dg-cal{flex:none;width:40px;height:38px;display:grid;place-items:center;border:none;border-radius:999px;background:var(--chip);color:var(--muted);cursor:pointer;transition:background-color .2s ease,color .2s ease}
 .dg-cal svg{width:16px;height:16px}
 .dg-cal.active{background:var(--accent);color:var(--accent-ink)}
 .dg-pop{position:absolute;right:16px;bottom:calc(100% + 6px);background:var(--surf);border-radius:16px;padding:7px;display:flex;flex-direction:column;gap:6px;box-shadow:0 14px 34px -10px rgba(20,30,50,.4);border:1px solid var(--line);width:160px;z-index:6;animation:fadein .18s ease}
 .dg-pop[hidden]{display:none}
-.dg-pop button{padding:9px 13px;border:none;border-radius:11px;background:var(--surf2);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:700;text-align:left;cursor:pointer}
+.dg-pop button{padding:9px 13px;border:none;border-radius:11px;background:var(--chip);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:700;text-align:left;cursor:pointer}
 .dg-pop button.active{background:var(--accent);color:var(--accent-ink)}
 
 /* SVG-Animationen der Grafik: Linie „zeichnen", Punkte „aufpoppen" (Klassen via JS, nur ohne reduced-motion) */
@@ -933,7 +951,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .rp-period{font-size:16.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin-bottom:3px}
 .rp-count{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:11px}
 .rp-pills{display:flex;gap:7px}
-.rp-pill{flex:1;text-align:center;padding:7px 6px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:var(--surf2);color:var(--muted);border:none;font-family:inherit;cursor:pointer;transition:background-color .2s,color .2s}
+.rp-pill{flex:1;text-align:center;padding:7px 6px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:var(--chip);color:var(--muted);border:none;font-family:inherit;cursor:pointer;transition:background-color .2s,color .2s}
 .rp-pill.active{background:var(--accent);color:var(--accent-ink)}
 .rp-dates{display:flex;gap:8px;margin-top:9px}
 .rp-date{flex:1;display:flex;flex-direction:column;gap:3px;font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:7px 11px}
@@ -957,13 +975,13 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .rp-scaler{transform-origin:top left;display:block}
 .rp-anh-lbl{font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--muted);margin:12px 0 8px}
 .rp-actions{flex:none;display:flex;align-items:center;gap:10px;padding:12px 16px calc(16px + env(safe-area-inset-bottom));background:var(--surf);border-top:1px solid var(--line)}
-.rp-sq{width:52px;height:52px;flex:none;border-radius:14px;background:var(--surf2);color:var(--ink);border:1px solid var(--line);display:grid;place-items:center;cursor:pointer}
+.rp-sq{width:52px;height:52px;flex:none;border-radius:14px;background:var(--chip);color:var(--ink);border:1px solid var(--line);display:grid;place-items:center;cursor:pointer}
 .rp-sq svg{width:20px;height:20px}
 .rp-sq:active{background:var(--line)}
 .rp-print{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;height:52px;background:var(--accent);color:var(--accent-ink);border:none;border-radius:14px;font-size:15.5px;font-weight:800;cursor:pointer;font-family:inherit}
 .rp-print svg{width:19px;height:19px}
 /* „Als Datei teilen": Ersatz fürs Drucken (zweiter, ruhigerer Knopf neben „Drucken") */
-.rp-share{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:52px;padding:0 8px;background:var(--surf2);color:var(--ink);border:1px solid var(--line);border-radius:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
+.rp-share{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:52px;padding:0 8px;background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
 .rp-share svg{width:18px;height:18px;flex:none;color:var(--accent)}
 .rp-actions .rp-print{font-size:14.5px;padding:0 8px}
 @media (max-width:389px){.rp-actions .rp-share svg,.rp-actions .rp-print svg{display:none}}

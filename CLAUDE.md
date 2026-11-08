@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~680 Z.), `styles.css` (~990 Z.), `vitals.js` (~230 Z.), `app.js` (~2660 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v14`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v15`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 
@@ -98,11 +98,15 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
   `--accent-soft` (getönte Flächen, per `color-mix`), `--scrim` (Abdunkelung hinter Fenstern), Ampel je Kategorie
   `--g/y/r-ink/-soft/-bar`, Puls `--pulse-*`. Alte Namen (`--surface/--text/--border/--primary` …) bleiben als Aliasse.
 - **Echter Dark Mode** per `@media (prefers-color-scheme)` **und** `:root[data-theme]` (Hell/Dunkel/Auto im Menü).
+- **Kontrast im Dunkel-Modus (Entwurf G, 2026-11-08):** Karten (`--surf`) sind heller als der Grund, Innenkarten (`--surf2`)
+  liegen dunkler darin wie eine Mulde, Knöpfe darauf wieder hell. Knöpfe auf Innenkarten `--btn/--btn-bd`, Knöpfe auf Karten
+  und Leisten `--chip` (im Hellen `--surf` bzw. `--surf2`, sieht also aus wie vorher). Der offene Menü-Abschnitt hängt an
+  `--open-*` (dunkel: Akzent-Rahmen, getöntes Kopfband, gefülltes Symbol), die Fläche hinter Fenstern an `--dlg-backdrop`.
 - **Akzentfarben pro Modus** (`settings.accent`, Standard `kobalt`): Hell und Dunkel haben je eine eigene 6-Farben-Liste
   (`ACCENTS_LIGHT`/`ACCENTS_DARK`). `--accent` und `--accent-ink` (Schrift darauf, schwarz oder weiß) setzt JS
   (`applyAccent`/`applyTheme`/`resolveAccent`). Fehlt die Farbe im anderen Modus, fällt nur die **Anzeige** auf den
   Standard zurück, die Wahl bleibt gespeichert.
-- **Statusleiste (`theme-color`):** zwei Meta-Tags mit `media` (hell `#eef1f6`, dunkel `#0e131c` = `--bg`). Bei fest
+- **Statusleiste (`theme-color`):** zwei Meta-Tags mit `media` (hell `#eef1f6`, dunkel `#0a0e15` = `--bg`). Bei fest
   „Hell"/„Dunkel" setzt `applyThemeColor()` (aus `applyTheme`) beide auf das aktuelle `--bg`.
 - Schrift **Hanken Grotesk** lokal (`fonts/`, offline, keine Google-Fonts-Anfrage).
 
@@ -178,7 +182,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   (`e.target===dialog`). Nur der Inhalt scrollt, Kopf und „Menü schließen" bleiben fest.
 - **Reihenfolge:** **Backup · Daten · Zielbereich · Anzeige**, darunter die Karten **Anleitung** („10 Themen") und
   **App installieren** (`#mInstall`, nur im Handy-Browser sichtbar). Immer nur ein Abschnitt offen.
-- **Jeder Abschnitt ist eine eigene Karte** (`--surf`, Rand, Radius 18 px; geöffnet mit Schatten), Symbol im getönten
+- **Jeder Abschnitt ist eine eigene Karte** (`--surf`, Rand, Radius 18 px; geöffnet mit Schatten, im Dunklen mit Akzent-Rahmen und Kopfband), Symbol im getönten
   Quadrat, darunter eine **Stand-Zeile**: Backup = Stand in Ampelfarbe (ausgeblendet, solange Backup offen ist),
   Daten = Anzahl Messungen, Zielbereich = „Standardwerte"/„Eigene Werte", Anzeige = „Auto · Kobalt".
 - Größere Schrift, Blocküberschriften in normaler Schreibweise, Knöpfe mindestens 44–48 px hoch.
