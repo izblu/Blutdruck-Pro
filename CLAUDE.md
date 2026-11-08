@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~680 Z.), `styles.css` (~990 Z.), `vitals.js` (~230 Z.), `app.js` (~2660 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v16`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v18`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 

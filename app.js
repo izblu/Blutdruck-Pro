@@ -1858,7 +1858,16 @@ function applySettingsUI(){
   renderBackupState();
   updateDataSummary();
 }
-function openMenu(){ applySettingsUI(); updateStorageStatus(); refreshLinkFileUI(); $('#menuDlg').showModal(); }
+// Versionszeile: Nummer aus dem Namen des Offline-Speichers (Cache) „blutdruck-pro-v17“. Ohne Service Worker bleibt sie aus.
+async function refreshMenuVersion(){
+  const el=$('#menuVer'); el.hidden=true;
+  try{
+    const keys=await caches.keys();
+    const n=keys.map(k=>/^blutdruck-pro-v(\d+)$/.exec(k)).filter(Boolean).map(m=>+m[1]).sort((a,b)=>b-a)[0];
+    if(n){ el.textContent='Blutdruck Pro · Version '+n; el.hidden=false; }
+  }catch(e){}
+}
+function openMenu(){ applySettingsUI(); updateStorageStatus(); refreshLinkFileUI(); refreshMenuVersion(); $('#menuDlg').showModal(); }
 $('#menuBtn').addEventListener('click',openMenu);
 // Android-Warnung immer, wenn das automatische Backup hier überhaupt geht (verknüpft oder nicht).
 $('#fsWarn').hidden=!FS_SUPPORTED;

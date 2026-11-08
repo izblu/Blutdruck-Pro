@@ -419,6 +419,8 @@ dialog::backdrop{background:var(--dlg-backdrop,rgba(15,23,42,.55))}   /* Rückfa
 @keyframes pfeilWippen{0%,100%{transform:translateY(0)}50%{transform:translateY(10px)}}
 @media (prefers-reduced-motion:reduce){.inst-arrow.down{animation:none}}
 .acc-link[hidden]{display:none}
+.menu-ver{margin:14px 0 4px;text-align:center;font-size:13px;color:var(--muted)}
+.menu-ver[hidden]{display:none}
 
 /* Backup-Erinnerung (Hinweis-Leiste auf dem Dashboard) */
 .reminder{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--cat-y) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--cat-y) 45%,var(--border));border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:14px}
