@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~680 Z.), `styles.css` (~990 Z.), `vitals.js` (~230 Z.), `app.js` (~2660 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v15`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v16`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 
@@ -98,15 +98,18 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
   `--accent-soft` (getönte Flächen, per `color-mix`), `--scrim` (Abdunkelung hinter Fenstern), Ampel je Kategorie
   `--g/y/r-ink/-soft/-bar`, Puls `--pulse-*`. Alte Namen (`--surface/--text/--border/--primary` …) bleiben als Aliasse.
 - **Echter Dark Mode** per `@media (prefers-color-scheme)` **und** `:root[data-theme]` (Hell/Dunkel/Auto im Menü).
-- **Kontrast im Dunkel-Modus (Entwurf G, 2026-11-08):** Karten (`--surf`) sind heller als der Grund, Innenkarten (`--surf2`)
+- **Kontrast hell und dunkel (Entwurf G, 2026-11-08):** Karten (`--surf`) sind heller als der Grund, Innenkarten (`--surf2`)
   liegen dunkler darin wie eine Mulde, Knöpfe darauf wieder hell. Knöpfe auf Innenkarten `--btn/--btn-bd`, Knöpfe auf Karten
-  und Leisten `--chip` (im Hellen `--surf` bzw. `--surf2`, sieht also aus wie vorher). Der offene Menü-Abschnitt hängt an
-  `--open-*` (dunkel: Akzent-Rahmen, getöntes Kopfband, gefülltes Symbol), die Fläche hinter Fenstern an `--dlg-backdrop`.
+  und Leisten `--chip`. Der offene Menü-Abschnitt hängt an `--open-*` (Akzent-Rahmen, getöntes Kopfband, gefülltes Symbol; hell
+  zeigt das Symbol `--accent-ink`, dunkel `--bg`), die Fläche hinter Fenstern an `--dlg-backdrop`. Im Hellen liegen die Ampel-Schrift auf dem
+  Grund (Verlauf) und Kobalt auf den Mulden knapp über 4,5:1, `--bg` und `--surf2` also nicht dunkler machen, ohne die Schrift
+  nachzurechnen. Textknöpfe (`.btn-text`) nutzen `--btn-link`: hell die Akzentfarbe mit 18 % Schwarz, damit sie auch auf Grund
+  und Mulden lesbar bleiben, dunkel unverändert `--accent`.
 - **Akzentfarben pro Modus** (`settings.accent`, Standard `kobalt`): Hell und Dunkel haben je eine eigene 6-Farben-Liste
   (`ACCENTS_LIGHT`/`ACCENTS_DARK`). `--accent` und `--accent-ink` (Schrift darauf, schwarz oder weiß) setzt JS
   (`applyAccent`/`applyTheme`/`resolveAccent`). Fehlt die Farbe im anderen Modus, fällt nur die **Anzeige** auf den
   Standard zurück, die Wahl bleibt gespeichert.
-- **Statusleiste (`theme-color`):** zwei Meta-Tags mit `media` (hell `#eef1f6`, dunkel `#0a0e15` = `--bg`). Bei fest
+- **Statusleiste (`theme-color`):** zwei Meta-Tags mit `media` (hell `#d9e0ea`, dunkel `#0a0e15` = `--bg`). Bei fest
   „Hell"/„Dunkel" setzt `applyThemeColor()` (aus `applyTheme`) beide auf das aktuelle `--bg`.
 - Schrift **Hanken Grotesk** lokal (`fonts/`, offline, keine Google-Fonts-Anfrage).
 
@@ -278,7 +281,7 @@ Einstiege: Icon im Diagramm-Kopf (`#rpOpenChart`) und Menü → Daten (`#mReport
   `apple-mobile-web-app-title` „Blutdruck Pro", `apple-mobile-web-app-status-bar-style` `default` (die App hat eigene
   helle und dunkle Flächen), `theme-color` je Modus (siehe Design-Tokens). Wie das auf dem iPhone wirkt, ist **erst
   am Gerät sicher**.
-- **Manifest:** `theme_color` und `background_color` `#eef1f6` (heller App-Hintergrund, z. B. Startbild auf Android).
+- **Manifest:** `theme_color` und `background_color` `#d9e0ea` (heller App-Hintergrund, z. B. Startbild auf Android).
 
 ### Allgemeine Bausteine
 - **Speicher:** Messwerte und Einstellungen in der Browser-Datenbank (IndexedDB, Stores `entries`, `vitals`, `meta`),
