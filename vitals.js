@@ -10,8 +10,12 @@
 const IC_PATH_TEMP='M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z';
 /* Sauerstoff: aufsteigende Bläschen (Entscheidung 2026-11-06, ersetzt den Tropfen). */
 const IC_PATH_SPO2='M4 17a4 4 0 1 0 8 0a4 4 0 1 0-8 0M13.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0-5.6 0M8.1 7.5a1.9 1.9 0 1 0 3.8 0a1.9 1.9 0 1 0-3.8 0M13.8 4a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0-2.4 0';
-/* Gewicht: Personenwaage mit Zeiger. */
-const IC_PATH_WEIGHT='M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zM7.5 10a6 6 0 0 1 9 0M12 11l1.8-3';
+/* Gewicht: Gewichtsstein mit „KG" (Entscheidung 2026-11-08, ersetzt die Personenwaage).
+   Als Liste [Pfad, Linienstärke], weil die Buchstaben in der normalen Stärke zulaufen würden. */
+const IC_PATH_WEIGHT=[
+  ['M9.4 5.4a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0-5.2 0M7.2 9h9.6a2 2 0 0 1 2 1.6l1.8 8a2 2 0 0 1-2 2.4H5.4a2 2 0 0 1-2-2.4l1.8-8a2 2 0 0 1 2-1.6z',2.2],
+  ['M8 12.8v5.4M11 12.8l-3 2.9 3 2.5M16.8 13.6a2.5 2.5 0 0 0-4 2.1a2.5 2.5 0 0 0 4 2v-2h-1.5',1.6]
+];
 const IC_PATH_BP='M3 12h5l2.5-7 3 14 2.5-9 2 2h3';
 const METRICS={
   temp:{key:'temp',name:'Temperatur',long:'Körpertemperatur',unit:'°C',dec:1,plaus:[34,43],seg:'TEMP',icon:IC_PATH_TEMP},
@@ -23,7 +27,9 @@ const VITAL_TYPES=['temp','spo2','weight'];
 const hasAmpel=type=>type!=='weight';
 /* Standard-Grenzen (gängige Richtwerte, keine Leitlinie – siehe Spezifikation Abschnitt 2). */
 const VITAL_THR_DEFAULT={tempLow:36.0,tempY:37.5,tempR:38.1,spo2G:95,spo2Y:93};
-const icSvg=(path,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||2.2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+path+'"/></svg>';
+/* path: ein Pfad oder eine Liste [Pfad, Linienstärke] für Symbole mit mehreren Stärken. */
+const icSvg=(path,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||2.2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  +(Array.isArray(path)?path.map(p=>'<path d="'+p[0]+'" stroke-width="'+p[1]+'"/>').join(''):'<path d="'+path+'"/>')+'</svg>';
 
 /* ---------- Anzeige ---------- */
 /* Temperatur und Gewicht immer mit einer Nachkommastelle und Komma (37,0), Sauerstoff ganzzahlig. */

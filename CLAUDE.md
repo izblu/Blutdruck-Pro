@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~680 Z.), `styles.css` (~990 Z.), `vitals.js` (~230 Z.), `app.js` (~2660 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v13`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v14`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 
@@ -84,6 +84,8 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
   `fmtMetric`/`meanMetric`, Ziffern-Logik (`CAP_DEF`, `digitTarget`, `rawComplete`, `capFieldCat`, `capFieldOdd`),
   Speicher (`addVital`/`updateVital`/`removeVital`/`normVital`), Zählen (`totalCount`, `countParts`) und die
   zeitgetreue Grafik (`buildMetricChart`, `metricScale`).
+- **Symbol Gewicht:** Gewichtsstein mit „KG“ (`IC_PATH_WEIGHT`, zweite Kopie im Plus-Blatt in `index.html`). Zwei
+  Linienstärken, deshalb darf `icSvg` statt eines Pfads eine Liste `[Pfad, Stärke]` bekommen.
 - **Gewicht** (kg, eine Nachkommastelle) hat **keine Ampel** (`hasAmpel`, wie der Puls): nur die Zahl in `--ink`, kein Punkt, kein
   Wort, kein Zielbereich; Schriftfarbe über `metricInk`. Nicht dabei: Zielgewicht, BMI, Pfund, Trend, Körpergröße.
 - **Ampel:** Temperatur Niedrig · Normal · Erhöht · Fieber, Sauerstoff Zu niedrig · Niedrig · Im Ziel. Grenzen in

@@ -4,3 +4,6 @@ design/
 
 # Lokale Entwicklungs-Konfiguration (Dev-Server)
 .claude/launch.json
+
+# Ausgedachte Test-Backup-Datei (nur lokal zum Laden in die App)
+blutdruck-pro-backup-TESTDATEN.txt
