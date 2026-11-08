@@ -1,12 +1,23 @@
-# Blutdruck – Projektkontext für Claude
+# Blutdruck Pro – Projektkontext für Claude
 
-Eine kleine PWA zum Erfassen von Blutdruck-Werten. Aufgeteilt in [index.html](index.html)
-(HTML-Struktur), [styles.css](styles.css) (Gestaltung/CSS) und [app.js](app.js)
-(Logik/JavaScript), dazu `sw.js` (Offline) und `manifest.webmanifest` (Installation).
-Kein Build, kein Framework, keine Abhängigkeiten.
+Eine kleine PWA zum Erfassen von **Blutdruck und Puls, Körpertemperatur und Sauerstoffsättigung (SpO₂)**.
+Weiterentwicklung der alten App [izblu/Blutdruck](https://github.com/izblu/Blutdruck) im eigenen Repo
+**izblu/Blutdruck-Pro**, live unter https://izblu.github.io/Blutdruck-Pro/ (GitHub Pages). **Jeder Push ist kurz
+darauf live.** Hauptgerät ist das **iPhone**, Android muss weiter funktionieren.
+
+Aufgeteilt in [index.html](index.html) (HTML-Struktur), [styles.css](styles.css) (Gestaltung/CSS),
+[vitals.js](vitals.js) (Grundlagen für Temperatur & Sauerstoff) und [app.js](app.js) (Logik/JavaScript), dazu
+[sw.js](sw.js) (Offline) und [manifest.webmanifest](manifest.webmanifest) (Installation). **Kein Build, kein
+Framework, keine Abhängigkeiten, kein Server.**
+
+Fachliche Regeln stehen in eigenen Spezifikationen:
+[vitalwerte-spezifikation.md](vitalwerte-spezifikation.md) (Temperatur & Sauerstoff, Ziffern-Logik, großes +),
+[dashboard-spezifikation.md](dashboard-spezifikation.md) und
+[arzt-report-spezifikation.md](arzt-report-spezifikation.md).
 
 ## Sprache
-- Mit dem Nutzer immer auf **Deutsch** kommunizieren
+- Mit dem Nutzer immer auf **Deutsch** kommunizieren.
+- Den Nutzer **nicht mit Namen** ansprechen.
 
 ## Zusammenarbeit / Erklärstil
 Der Nutzer ist **Programmier-Anfänger**. Deshalb:
@@ -14,201 +25,255 @@ Der Nutzer ist **Programmier-Anfänger**. Deshalb:
 - **Fachbegriffe in Klammern** hinter die einfache Erklärung setzen, z. B. „Browser-Datenbank
   (IndexedDB)", damit der Nutzer die Fachsprache nebenbei mitlernt.
 - Vor größeren Änderungen kurz Optionen/Plan zeigen statt sofort drauflos zu bauen.
+- **Unbestätigtes nicht als Tatsache darstellen.** Offen sind vor allem: das Teilen-Menü auf dem iPhone, ob
+  Safari-Daten in der installierten App ankommen, ob `window.print` in der installierten App druckt, die
+  Fieber-Grenzen (keine Leitlinie gefunden) und die Wirkung der iPhone-Meta-Tags (Statusleiste).
+- **Kontext im Blick behalten:** Ab etwa 150k Token von selbst eine Übergabe-Notiz schreiben und eine neue
+  Sitzung mit frischem Kontext vorschlagen bzw. starten (nach einem Commit, vor dem nächsten Schritt).
 
 ## Commit-Ablauf (WICHTIG – ausdrücklicher Wunsch des Nutzers)
-- Wenn ein abgeschlossener, getesteter Stand erreicht ist: **NICHT sofort** Commit-Texte erzeugen.
-- **Zuerst fragen**, ob der Nutzer zum Committen bereit ist.
-- **Erst nach seiner Bestätigung** zwei Texte liefern – jeweils in einem **eigenen Code-Block**
-  (damit die Kopier-Funktion funktioniert):
-  1. **Zusammenfassung** – eine kurze Betreffzeile.
-  2. **Beschreibung** – Stichpunkte mit den Details der Änderung.
-- Der Nutzer committet/pusht selbst über **GitHub Desktop**
+- Wenn ein abgeschlossener, getesteter Stand erreicht ist: **zuerst fragen**, ob committet und gepusht werden soll.
+- **Nach dem Ja committet und pusht Claude selbst** (der Nutzer muss nichts im Terminal eingeben). Commit-Text:
+  kurze Betreffzeile, darunter Stichpunkte mit den Details.
+- Grund für die Rückfrage: Jeder Push ist kurz darauf auf GitHub Pages live.
+- Nur eigene Dateien committen. **`izblu/Blutdruck` und `izblu/File-Compressor` nie anfassen.**
 
-## Aktueller Stand / bisherige Überarbeitungen
-- **UI/UX-Modernisierung (Stufen 1–6, erledigt 2026-07-11):** Die gesamte sichtbare Schicht wurde
-  nach dem „Claude-Design"-Entwurf neu gebaut (reines HTML/CSS/JS, kein Build). **Datenmodell,
-  Speicher, Backup und Einstellungen blieben unverändert** – nur neu verkabelt. Kernpunkte:
-  - **Design-Tokens** (`:root` in [styles.css](styles.css)): Struktur
-    `--bg/--surf/--surf2/--ink/--muted/--line/--accent`, Ampel je Kategorie `--g/y/r-ink/-soft/-bar`,
-    Puls `--pulse-*`. Echter **Dark Mode** (per `@media (prefers-color-scheme)` **und**
-    `:root[data-theme]`) plus **Akzentfarben pro Modus** (`settings.accent`, Standard `kobalt`):
-    Hell und Dunkel haben je eine eigene, kuratierte 6-Farben-Liste (`ACCENTS_LIGHT`/`ACCENTS_DARK`
-    in app.js) statt gemeinsamer Töne nur auf-/abgehellt – einzelne Farben kommen bewusst nur in
-    einem Modus vor (z. B. „Iris" nur hell, „Aqua" nur dunkel). `--accent` (Fläche) **und**
-    **`--accent-ink`** (Schrift/Icon darauf – schwarz oder weiß, je nach Helligkeit der Fläche)
-    werden gemeinsam per JS gesetzt (`applyAccent`/`applyTheme`/`resolveAccent`); wählt man eine
-    Farbe, die im anderen Modus fehlt, fällt nur die **Anzeige** auf den Standard zurück (die
-    eigentliche Wahl bleibt gespeichert und gilt wieder, sobald der Modus zurückwechselt). Alte
-    Token-Namen (`--surface/--text/--border/--primary` …) bleiben als Aliasse. Schrift
-    **Hanken Grotesk** lokal (`fonts/`, offline – keine Google-Fonts-Anfrage).
-  - **Navigation:** feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit zentralem
-    „+"-Knopf (FAB, → neue Messung); Screen-Router `showTab(name)`
-    (`dashboard/capture/table/detail/chart`) blendet die passenden Vollbild-Screens ein. „Tabelle"
-    heißt jetzt **„Verlauf"** (Screen-Id bleibt `#tab-table`).
-  - **Dashboard** (Startseite, `renderDashboard`): letzte Messung mit Ampel-Status, Ø 7 Tage + Trend
-    (vs. Vorwoche), Ø Puls, Ampel-Verteilungs-Ring 30 Tage. Kennzahlen nach
-    [dashboard-spezifikation.md](dashboard-spezifikation.md). **Einblend-Animation** beim Öffnen
-    (`animateDashboard`, per `requestAnimationFrame`, 680 ms, weiches Auslaufen): die großen Werte der
-    letzten Messung **zählen hoch** (Count-up) und der Verteilungs-Ring wird **kreisförmig aufgedeckt**
-    (der Farb-Kreis liegt als eigene Ebene `.ring-fill` unter der Mitte, eine `conic-gradient`-Maske
-    `--sweep` dreht von 0° auf 360°) samt hochzählender Prozentzahl. Respektiert
-    `prefers-reduced-motion` (dann sofort Endwert). Die übrigen Screens nutzen die
-    Entwurfs-Animationen (CSS-Keyframes, ebenfalls hinter `prefers-reduced-motion`):
-    **gestaffeltes Einblenden** (Dashboard-Karten via `nth-child`-Delay, Verlauf-Zeilen und
-    Diagramm-Punkte je mit `animation-delay` beim Rendern), **eingleitende Ampel-Marker** im
-    Detail (`markerGlide`, seitlicher Glide, versetzt 0,06/0,14 s) und **Bottom-Sheet-Slide**
-    fürs Öffnen von Menü/Anleitung (`#menuDlg/#helpDlg[open]` → `sheetSlide` + `scrimIn`).
-  - **Erfassen** (`#tab-capture`, geführte Eingabe): Sys → Dia → Puls einzeln über einen **eigenen
-    Ziffernblock**, große Vorschauzahl, Segment-Kacheln mit Ampel-Rückmeldung, Datum/Uhrzeit- und
-    Notiz-Sheet, Speichern-Häkchen. Verkabelt mit `addEntry`/`updateEntry`. Ersetzt die alte
-    Freitext-Eingabe **und** den früheren Bearbeiten-Dialog (`editDlg` entfiel).
-  - **Verlauf** (Liste) + **Detail-Screen:** chronologische Liste (Sys/Dia je in `catVal`-Farbe,
-    Zeilenpunkt = schlechterer), Zeitraum-Pillen 7/30/90 + eigener Von–Bis-Wähler; Zeile → Detail
-    (großer Wert in Ampelfarbe, Status, Position auf der Ampel-Skala, Kontext-Satz, Notiz;
-    Bearbeiten → Erfassen-Edit / Löschen → `askConfirm` + `removeEntry`).
-  - **Diagramm** (`renderChart`, SVG): Steuerleiste Sys/Dia/Beide + Puls-Umschalter + geteilter
-    Zeitraum; Verbindungslinien + **Ampel-Farbpunkte** (`catVal`) + gestrichelte Ø-Linie, **keine**
-    Schwellen-Linien/Zonen mehr. Ersetzt das alte 7-Linien-Diagramm samt `renderStats`. Der
-    Puls-Umschalter baut dafür **nicht** jedes Mal das ganze Diagramm neu: `setDiagPulseLayer`
-    fügt nur die rosa Puls-Ebene (`<g class="dg-pulse-g">` – Linie, Punkte, „bpm"-Beschriftung,
-    gebaut von `diagPulseLayer`) ein bzw. blendet sie aus (Fade-out per CSS, danach entfernt) und
-    verschiebt Höhe/Datumszeile der Grafik mit; die Sys-/Dia-Linien und -Punkte bleiben dabei
-    unangetastet und spielen ihre Einblend-Animation nicht erneut ab. `renderChart`/`buildDiagChart`
-    laufen weiterhin komplett bei Wechsel von Reihe oder Zeitraum.
-  - **Ampel pro Wert:** `catVal(v,y,r)` (Sys/Dia getrennt) neben der Gesamt-Ampel `category(e)`
-    (schlechterer von beiden). Schwellenwerte `settings.thr` – editierbar unter Menü → Anzeige →
-    „Zielbereich" (Ampel-Chips); „Design" dort für Hell/Dunkel/Auto + Akzentfarbe.
-  - **Obsolet:** die Schalter **„Werte-Ampel" (`colorDots`)** und **„Schwellenwert-Linien"
-    (`guideLines`)** sind aus der UI verschwunden (Verlauf färbt immer pro Wert, Diagramm nutzt immer
-    Farbpunkte); die Schlüssel bleiben in `settings`/Backup (Rückwärtskompatibilität), `updateThrEnabled`
-    entfiel. Toter Code aus dem Umbau wurde entfernt (u. a. `getSorted`, alte Tabellen-/Menü-CSS).
-- **Arzt-Report (Druck/PDF)** (erledigt 2026-07-14, aus dem „Claude-Design"-Entwurf umgesetzt):
-  ein aufbereiteter, **druckbarer** A4-Bericht für den Arztbesuch (`window.print`). **Reine
-  Datenaufbereitung, keine Diagnose/Bewertung.** Erreichbar über **zwei Einstiege**: Icon im
-  Diagramm-Kopf (`#rpOpenChart`) **und** Menü → Daten (`#mReport`), beide rufen `openReport()`.
-  - **Report-Menü** (eigener Vollbild-Screen `#tab-report`, geöffnet per `navPush('report')`):
-    Zeitraum-Pillen **30/90/Eigener** (+ Von–Bis-Datumsfelder), **Report-Farbe** (5 Swatches
-    Kobalt/Indigo/Petrol/Violett/Graphit), Schalter **Namensfeld/Puls einbeziehen/Anhangseite**,
-    **verkleinerte Live-Vorschau** der A4-Seite(n) und **Drucken**. Das Menü-Chrome folgt dem
-    App-Theme; die A4-Seiten sind **immer hell** (Druck auf Weiß).
-  - **A4-Seite 1 „Kompakt"** (`rpPage`): Kopf + Meta-Kachel (Zeitraum/Messungen, optional
-    Namens-/Geburtsdatumsfeld), **Gesamt-Durchschnitt gesplittet** (Sys/Dia + Ampel-Chip · Puls),
-    **Tageszeit** (morgens/tagsüber/abends, „—" wenn leer), **Ampel-Verteilung als Ring/Donut** +
-    „% über Ziel" neben **Höchst/Tiefst**, **Verlaufs-Diagramm**, **Wertetabelle** (Sys = gefüllte
-    Scheibe, Dia = hohler Ring), **Fußnote** (angewendete Grenzwerte + Tageszeit-Definition +
-    Haftungshinweis). **Anhang „Seite 2" (Querformat, `rpLandscape`)** nur auf Wunsch: großes
-    Detail-Diagramm mit **Wert + Datum je Messpunkt**.
-  - **Technik:** `reportData(from,to)` bündelt alle Kennzahlen aus **vorhandener** Logik
-    (`meanKey`/`category`/`catValFor`/`todOf`/`roundTo100`, Grenzwerte `settings.thr`); eigener
-    Bereichsfilter, **nicht** das geteilte `filters`-Objekt. Feste helle Palette `RP` (Ausdruck
-    theme-unabhängig hell); **eigene** Grafik `rpChart` (zeit-proportionale X-Achse, `detailed`-Modus
-    für Seite 2) – das App-Diagramm `buildDiagChart` bleibt unberührt. Der Report-Zustand
-    (`reportState`) ist **bewusst flüchtig**: bei jedem Öffnen auf Standard (Kobalt, 30 Tage,
-    Puls+Namensfeld an, Anhang aus), **nichts** landet in `settings`/Backup. **Druck:** `@media print`
-    zeigt nur den Container `#reportPrint` (naturgroße Seiten) über **benannte `@page`** (portrait +
-    landscape für den Anhang), `print-color-adjust:exact`, `break-inside`-Schutz gegen unschöne
-    Umbrüche. **Bewusst (noch) nicht:** ein **Teilen-Knopf** (build-frei nicht sauber; Weg =
-    „Drucken → Als PDF speichern → teilen") und ein **zweiter Grenzwerte-Editor** im Report-Menü
-    (der Report liest `settings.thr`; geändert wird unter Menü → Anzeige → „Zielbereich").
-- **Code-Struktur:** `index.html` (~415 Z.), `styles.css` (~755 Z.) und `app.js` (~1815 Z.); eingebunden
-  per `<link rel="stylesheet">` und `<script src="./app.js" defer></script>`. `sw.js` cacht alle Dateien
-  offline (Cache **`blutdruck-pro-v1`**, `fetch` revalidiert per `cache:'no-cache'` gegen alte Zwischen-
-  speicher), inkl. `fonts/hanken-grotesk.woff2`. Kein Build, kein Framework,
-  keine Abhängigkeiten.
-- **Speicher:** Messwerte **und Einstellungen** liegen in der Browser-Datenbank (IndexedDB), mit
-  `localStorage` als Spiegel/Fallback und einmaliger automatischer Migration. Einstellungen liegen
-  im `meta`-Store unter dem Schlüssel `'settings'` (`idbGetMeta`/`idbSetMeta`); nach dem Laden aus
-  IndexedDB wird der `localStorage`-Spiegel sofort wieder aufgefüllt (kein Theme-Aufblitzen beim
-  nächsten Start). Speichern ist zweigeteilt: `persistSettings()` (nur ablegen) vs. `saveSettings()`
-  (ablegen **+** Auto-Backup-Datei planen) – interne Buchhaltung (`markDirty`/`markBackedUp`/Snooze)
-  nutzt bewusst `persistSettings()`, sonst entstünde beim automatischen Schreiben eine
-  Endlosschleife. Beim Start wird dauerhafter Speicher angefordert
-  (`navigator.storage.persist()`), Schutz gegen automatisches Löschen (Eviction/ITP).
-- **Backup** (Menü-Abschnitt; zwei Gruppen als abgesetzte Karten `.grp-card`, darunter „Backup teilen"):
-  - **Automatisches Backup** (immer dieselbe Datei via File System Access API; nur Chromium, sonst
-    ausgegraut). Zustandstext **grün** „Verknüpft: ‹Dateiname›" bzw. **rot** „Keine Datei verknüpft"
-    (nur der Dateiname – Browser geben aus Sicherheitsgründen keinen vollständigen Pfad her und
-    können Datei/Ordner nicht im Datei-Manager öffnen). Zwei Knöpfe **nebeneinander, einzeilig**
-    (links Status setzen, rechts bestehende Datei): nicht verknüpft → **„Neu anlegen"** (Speichern-
-    Dialog `showSaveFilePicker`, legt an + verknüpft sofort) / **„Auswählen"**; verknüpft →
-    **„Lösen"** / **„Ändern"**. „Auswählen"/„Ändern" nutzen den **Öffnen-Dialog** (`showOpenFilePicker`,
-    keine „Ersetzen?"-Frage, keine „(1)"-Dubletten) und **führen** den Datei-Inhalt mit den App-Daten
-    **zusammen** (datensicher – eine reichere Datei verliert nichts; Nebeneffekt: ohne Lösch-
-    Protokoll könnte ein gelöschter, in der Datei noch vorhandener Eintrag zurückkommen), bevor
-    verknüpft und zurückgeschrieben wird. Danach schreibt jede Änderung automatisch in die Datei
-    (`scheduleAutoBackup`/`autoBackupIfLinked`). „Jetzt sichern" entfällt (durch die Automatik
-    überflüssig).
-  - **Manuelles Backup:** zwei Knöpfe nebeneinander **„Speichern"** (Download) / **„Wiederherstellen"**
-    (Datei laden – .txt oder ältere .json –, Statistik „X neu, Y aktualisiert"; Merge-Kern
-    `mergeEntriesFromData`, geteilt mit „Auswählen") plus **„Erinnerung"** (erinnert nach X Tagen
-    ungesicherter Änderungen ans Backup).
-  - **„Backup teilen"** (Web Share API; klappt das Teilen nicht, fragt ein Dialog, ob stattdessen
-    heruntergeladen wird) als breiter Knopf **unter** beiden Karten – übergreifend für beide Methoden.
-  - **Backup-Format (v2):** Die Datei enthält jetzt `{app, version, exportedAt, entries, settings}`
-    statt nur eines reinen `entries`-Arrays (`backupData()`/`backupSettings()`). Gesichert werden nur
-    die **Vorlieben** (`colorDots`, `guideLines`, `theme`, `accent`, `reminderDays`, `thr`) – geräte-interne
-    Erinnerungs-Merker (`firstDirtyAt`, `snoozeUntil`) nicht. Ältere Backups (reines Array) bleiben
-    les- und wiederherstellbar; `mergeEntriesFromData` erkennt beide Formen.
-  - **Einstellungen-Rückfrage beim Wiederherstellen** (`#restoreDlg`, eigenes Fenster statt
-    Browser-`confirm`, da Knopf-Texte sonst nicht anpassbar sind): Enthält ein eingelesenes Backup
-    auch Einstellungen, erscheint „Werte und Einstellungen übernehmen" (primärer Knopf) /
-    „Nur die Werte übernehmen" (Text-Knopf); Raustippen/Esc = nur Werte (sichere Vorgabe). Ausgelöst
-    von `offerSettingsRestore()`, geteilt von „Wiederherstellen" (`importJSON`) und
-    „Auswählen"/„Ändern" (`pickBackupFile`). Messwerte werden in jedem Fall zusammengeführt.
-- **Menü:** als **klappbare Abschnitte** in fester Reihenfolge **Backup · Daten · Anzeige** plus
-  „Anleitung". Geöffnet über das **„Menü"-Icon in der Tab-Bar** (Dashboard · Verlauf · [ + ] ·
-  Diagramm · Menü). Im Abschnitt „Backup" stehen die zwei Gruppen (Automatisches/Manuelles Backup)
-  als **abgesetzte Karten** (`.grp-card`, Überschrift `.grp-head`). Das Menü-Fenster ist schmaler als der
-  Bildschirm, hat eine eigene Hintergrundfarbe (`--menu-bg`) und lässt ringsum Rand zum Raustippen.
-  Beim Öffnen eines Abschnitts ist nur der **Inhalt scrollbar** – Kopf- und Fußleiste bleiben fest
-  (offenes Fenster als senkrechter Flex-Container, `dialog[open]`), sodass „Menü schließen" nie
-  abgeschnitten wird. **Keine Trennlinien** – der aufgeklappte Abschnitt hebt sich als **weiße Karte**
-  mit Schatten ab (Karte `--surf`, das Abschnitts-Icon wird akzent-getönt); **immer nur ein Abschnitt
-  offen** (einen anderen öffnen schließt den vorigen). Oben eine **Griffleiste** (`.dlg-grab`); das
-  Fenster sitzt **unten am Bildschirmrand** (daumenfreundlich) und schließt nur bei echtem Tippen auf
-  die Backdrop-Fläche (`e.target===dialog`). Aus der Anleitung führt ein „‹ Zurück"-Button wieder ins
-  Menü; Schließen-Buttons heißen „Menü schließen".
-- **Zoom-Schutz (Mobil):** Eingabefelder haben mind. 16 px Schrift (sonst zoomt der Browser beim
-  Antippen hinein) und `*{touch-action:manipulation}` in `styles.css` verhindert den Doppeltipp-Zoom
-  (v. a. iOS/Safari, z. B. 2× dieselbe Ziffer im Ziffernblock). Zwei-Finger-Zoom bleibt bewusst
-  erlaubt (Barrierefreiheit); spezifischere Regeln (z. B. `pan-y` am Toast) gehen vor.
-- **Nicht unterstützte Funktionen** werden nicht versteckt, sondern **ausgegraut** mit kurzer
-  Begründung (z. B. „Auf diesem Gerät nicht verfügbar").
-- **Daten** (Abschnitt, vormals „Verwalten"): „Als CSV exportieren (Excel)" (für die Auswertung),
-  „Alle Daten löschen" (mit Sicherheitsabfrage; die externe Backup-
-  Datei bleibt dabei erhalten) und – darunter – eine Info-Zeile mit der **Speicherbelegung**
-  (belegt von Kapazität · Prozent, sofern der Browser eine Quota liefert).
-  Der frühere Persistenz-Status/„Aktivieren"-Link entfiel (dauerhafter Speicher wird beim Start
-  automatisch angefordert).
-- **Anleitung:** umgangssprachliches Hilfe-Pop-up (`helpDlg`), an die neue Bedienung angepasst
-  (geführte Eingabe, Dashboard, Verlauf/Detail, neues Diagramm, Automatisches/Manuelles Backup,
-  Aussehen/Akzentfarbe, App-Installation).
-- **Fehler:** Wenn der Speicher voll ist (QuotaExceededError), erscheint ein Hinweis statt
-  stillem Fehlschlag.
-- **Meldungen (Toasts):** kurze Rückmeldungen unten als farbige Karte mit Icon in drei Kategorien –
-  **Erfolg** (grün, Haken), **Hinweis** (gelb/amber, Dreieck) und **Fehler** (rot, Dreieck).
-  4 s sichtbar, per **Wischen** zur Seite schließbar; helle Flächen → in Hell und Dunkel lesbar.
-  Funktion `toast(msg, kind)` mit `kind ∈ success | notice | error` (Default `success`). Bei offenem
-  Fenster (Dialog) wird der Toast **in das Fenster gerendert**, damit er über dem Menü sichtbar **und**
-  wischbar bleibt (ein modales Fenster macht alles außerhalb „unberührbar"/inert); beim Schließen des
-  Fensters wandert eine noch sichtbare Meldung zurück in den Body.
-- **Bestätigen-Dialoge (`askConfirm`):** Die drei früheren Browser-`confirm()`-Popups sind durch
-  **einen** eigenen, gestaltbaren Dialog (`#confirmDlg`) ersetzt – einheitlicher Look in Hell/Dunkel,
-  mit Symbol-Kreis im Kopf. Zentrale Funktion `askConfirm(opts)` (Promise → `true`/`false`). Optionen:
-  `icon` (`trash`/`info`) + `tone` (`danger` = rot / `notice` = amber), `title`, `message` **oder**
-  `messageHTML` (für Fettdruck, nur App-eigene Texte), `confirmLabel`/`cancelLabel`, `danger` (roter
-  Füll-Knopf `.btn-fill-danger` statt blauem `.btn-fill`), `previewHTML` (zentrierte Vorschau-Karte),
-  `detailsText` (ausklappbares `<details>` „Technische Details"), `noteText` (Hinweiszeile mit
-  Info-Symbol) und `requireCheck` (Pflicht-Häkchen – hält den Bestätigen-Knopf deaktiviert, bis
-  angekreuzt; eigenes Kästchen: rot umrandet, gerundet, ohne Füllung). Der Meldungstext ist bewusst
-  **gedämpft** (`--muted`), hervorgehobene Teile via `<b>` in `--text`. Drei Aufrufstellen:
-  **Eintrag löschen** (`#detDelete` im Detail-Screen) mit Eintrags-Vorschau (Datum + Werte in
-  Ampelfarbe) und rotem „Löschen"; **Teilen-Fallback** in `shareBackup()` (amber, blaues „Speichern", Diagnose-Info in
-  „Technische Details" verstaut); **Alle Daten löschen** (`clearAllData()`) mit fetter Anzahl,
-  Info-Zeile zur erhaltenen Backup-Datei und Bestätigungs-Häkchen. Aufräumen des Zusatz-Blocks
-  (`#confirmExtra`) passiert beim **Aufbau**, nicht im `close`-Handler (sonst könnte ein verzögertes
-  Schließen-Ereignis frischen Inhalt leeren). `#confirmDlg` steht im HTML **nach** `menuDlg`/`helpDlg`/
-  `restoreDlg` (Toast-im-Dialog-Mechanismus). Die bestehenden Erfolgs-Toasts nach der Aktion bleiben erhalten.
+## Arbeitsumgebung und Test
+- **Python** nur mit vollem Pfad: `C:/Users/Guenay/AppData/Local/Programs/Python/Python314/python.exe`.
+  **Node ist nicht installiert.**
+- **Lokaler Server:** `.claude/launch.json` → `blutdruck-static` (Python `http.server`, Port **5173**,
+  `http://localhost:5173/`). Ist 5173 schon belegt, läuft dort meist schon ein Server für diesen Ordner – dann
+  einfach die Adresse direkt öffnen.
+- **Prüfen im eingebauten Browser** in Handygröße 375×812, **hell und dunkel**. Vorher den Service Worker abmelden
+  und die Caches leeren. Handygröße per Preset „mobile" meldet sich als **Android** → der Installations-Assistent
+  öffnet sich (per JS `$('#instDlg').close()` schließen; andere Wege mit `instOpen('ios'|'iosOther'|'android'|
+  'androidMenu'|'import')`). Für Screenshots Animationen abschalten:
+  `*{animation-duration:0s!important;animation-delay:0s!important;transition:none!important}`
+  (nicht `animation:none`, sonst bleiben die Diagrammlinien unsichtbar).
+- **iPhone kann Claude nicht testen.** Gerätetests macht der Nutzer selbst (siehe „Geparkte Aufgaben").
+
+## Aktueller Stand
+
+### Trennung von der alten App
+Pro startete als Kopie der alten App und hat **eigene interne Namen**, damit beide unter `izblu.github.io`
+nebeneinander laufen, ohne sich Daten zu teilen. Werte wandern nur per Backup-Datei.
+
+| Wofür | Alte App | Blutdruck Pro |
+|---|---|---|
+| Browser-Datenbank (IndexedDB) | `blutdruck` | `blutdruck-pro` (Version 2) |
+| Kopie im `localStorage` | `bp_entries`, `bp_settings` | `bpp_entries`, `bpp_settings`, `bpp_vitals` |
+| Offline-Speicher (Cache) | `blutdruck-v…` | `blutdruck-pro-v…` |
+| Backup-Dateiname | `blutdruck-backup-…` | `blutdruck-pro-backup-….txt` |
+
+`sw.js` löscht beim Aktualisieren **nur eigene** Offline-Speicher (Präfix `blutdruck-pro-`). Die Service Worker
+der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro lädt seine Dateien dann online neu.
+
+### Code-Struktur
+- `index.html` (~660 Z.), `styles.css` (~955 Z.), `vitals.js` (~215 Z.), `app.js` (~2535 Z.), `sw.js`.
+  Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
+- `sw.js`: Cache **`blutdruck-pro-v7`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+  Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
+  Änderung an App-Dateien die Cache-Version erhöhen.**
+- `iphone-test/`: vorübergehende Testseite für die drei offenen iPhone-Fragen; wird nach den Gerätetests gelöscht
+  (nur nach Rückfrage).
+
+### Temperatur & Sauerstoff (`vitals.js`, Details in der Vitalwerte-Spezifikation)
+- **Eigene Liste `vitals`**, getrennt von den Blutdruck-Einträgen `entries` (so bleibt ein Pro-Backup für die alte
+  App lesbar). Ein Datensatz, ein Wert: `{id, ts, type:'temp'|'spo2', value, note}`, `value` immer als Zahl.
+  Eigener Bereich der Browser-Datenbank (IndexedDB-Store `vitals`, `DB_VER` 2) plus `localStorage`-Kopie.
+- `vitals.js` enthält nur Definitionen: `METRICS` (Name, Einheit, Nachkommastellen, Plausibel-Bereich),
+  `VITAL_THR_DEFAULT`, `catMetric(type,v)` (Ampel **mit** Wort, weil Gelb bei der Temperatur zwei Bedeutungen hat),
+  `fmtMetric`/`meanMetric`, Ziffern-Logik (`CAP_DEF`, `digitTarget`, `rawComplete`, `capFieldCat`, `capFieldOdd`),
+  Speicher (`addVital`/`updateVital`/`removeVital`/`normVital`), Zählen (`totalCount`, `countParts`) und die
+  zeitgetreue Grafik (`buildMetricChart`, `metricScale`).
+- **Ampel:** Temperatur Niedrig · Normal · Erhöht · Fieber, Sauerstoff Zu niedrig · Niedrig · Im Ziel. Grenzen in
+  `settings.thr` (`tempLow`, `tempY`, `tempR`, `spo2Y`, `spo2G`) zusätzlich zu `sysY/sysR/diaY/diaR`. Die
+  Standardwerte sind gängige Richtwerte, die **Fieber-Grenzen sind nicht gegen eine Leitlinie bestätigt**.
+- Sauerstoff über 100 % ist die einzige Sperre; sonst gibt es nur den Prüf-Hinweis „Ungewöhnlicher Wert – bitte prüfen."
+
+### Design-Tokens, Dark Mode, Akzentfarben
+- **Design-Tokens** (`:root` in [styles.css](styles.css)): `--bg/--surf/--surf2/--ink/--muted/--line/--accent`,
+  `--accent-soft` (getönte Flächen, per `color-mix`), `--scrim` (Abdunkelung hinter Fenstern), Ampel je Kategorie
+  `--g/y/r-ink/-soft/-bar`, Puls `--pulse-*`. Alte Namen (`--surface/--text/--border/--primary` …) bleiben als Aliasse.
+- **Echter Dark Mode** per `@media (prefers-color-scheme)` **und** `:root[data-theme]` (Hell/Dunkel/Auto im Menü).
+- **Akzentfarben pro Modus** (`settings.accent`, Standard `kobalt`): Hell und Dunkel haben je eine eigene 6-Farben-Liste
+  (`ACCENTS_LIGHT`/`ACCENTS_DARK`). `--accent` und `--accent-ink` (Schrift darauf, schwarz oder weiß) setzt JS
+  (`applyAccent`/`applyTheme`/`resolveAccent`). Fehlt die Farbe im anderen Modus, fällt nur die **Anzeige** auf den
+  Standard zurück, die Wahl bleibt gespeichert.
+- **Statusleiste (`theme-color`):** zwei Meta-Tags mit `media` (hell `#eef1f6`, dunkel `#0e131c` = `--bg`). Bei fest
+  „Hell"/„Dunkel" setzt `applyThemeColor()` (aus `applyTheme`) beide auf das aktuelle `--bg`.
+- Schrift **Hanken Grotesk** lokal (`fonts/`, offline, keine Google-Fonts-Anfrage).
+
+### Navigation
+Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit zentralem „+"-Knopf (FAB). Screen-Router
+`showTab(name)` (`dashboard/capture/table/detail/chart/report`). Blätter und Ebenen laufen über `navPush`/`navBack`
+(Browser-Verlauf), damit der **Android-Zurück-Knopf** funktioniert; Blätter stehen in `NAV_SHEETS`
+(`#capDtSheet`, `#capNoteSheet`, `#rangeSheet`, `#dgPop`, `#plusSheet`).
+
+### Großes + und Erfassen (`#tab-capture`)
+- **Das große + hat drei wählbare Wege** (`settings.plusMode`, Standard **`'c'`**, kommt ins Backup), gewählt unter
+  Menü → Anzeige → „Neue Messung (Plus-Button)". `openPlus()` verzweigt:
+  - **A „Erst wählen"**: Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff.
+  - **B „Direkt starten"**: Blutdruck, oben ein Umschalter zu Temperatur/Sauerstoff.
+  - **C „Alles nacheinander"**: Sys → Dia → Puls → Temperatur → Sauerstoff; Fehlendes wird übersprungen. Jeder Wert
+    wird ein eigener Datensatz mit gleichem `ts`, die Notiz wird in alle kopiert. Puls lässt sich überspringen
+    (`pulse:null`, alle Puls-Stellen kommen damit klar).
+- **Geführte Eingabe** mit eigenem Ziffernblock, großer Vorschauzahl, Segment-Kacheln mit Ampel, Datum/Uhrzeit- und
+  Notiz-Blatt, Speichern-Häkchen. Feldliste je Art über `CAP_MODES`, Einstieg `startCapture({mode|entry|vital,
+  switcher},returnTab)`. Bearbeiten öffnet nur die Felder des einen Datensatzes; der Typ bleibt.
+- **Ziffern-Logik:** erkennt 2 oder 3 Stellen selbst (Sys mit 1/2 am Anfang dreistellig, Dia/Puls/SpO₂ mit 1,
+  Temperatur immer drei Ziffern, das Komma setzt die App: `368` → 36,8), 0 am Anfang wird ignoriert, vollständig →
+  automatisch weiter. Ampel erst bei vollständigem Wert.
+
+### Dashboard (`renderDashboard`, Startseite)
+„Letzte Messung + 7 Tage", alle vier Werte im selben Aufbau ([dashboard-spezifikation.md](dashboard-spezifikation.md)):
+- **Letzte Messung:** Karten Blutdruck + Puls · Temperatur · Sauerstoff, Zahl in Ampelfarbe mit Ampel-Punkt und
+  Ampel-Wort, Zeitpunkt relativ („vor 2 Std.", `relTime`). Antippen → Detail.
+- **Letzte 7 Tage** (rollierend, fest): je Wert nur der **Ø in Ampelfarbe + Wort** (Puls ohne Ampel), **erst ab 3
+  Messungen** (`DASH_MIN`), sonst „Zu wenige Messungen" bzw. „Keine Messung in den letzten 7 Tagen". Antippen →
+  Diagramm mit diesem Wert, 7 Tage.
+- **Entfallen:** Trend zur Vorwoche, Ampel-Ring 30 Tage, „x von y im Ziel", Punktreihe, jede Verlaufsgrafik
+  (Verläufe gehören in den Tab „Diagramm").
+- **Einblend-Animation** (`animateDashboard`, 680 ms): ganze Zahlen zählen hoch (Temperatur ohne Animation),
+  Karten blenden gestaffelt ein. Alles hinter `prefers-reduced-motion`.
+
+### Verlauf, Detail und Diagramm
+- **Umschalter** Blutdruck · Temperatur · Sauerstoff (`.metric-seg`, Zustand `viewMetric`, flüchtig) und
+  **gemeinsamer Zeitraum** 7/30/90 + Von–Bis (`applyVerlaufRange`, `filters.from/to`) gelten für Verlauf **und**
+  Diagramm.
+- **Verlauf** (`renderTable`, Screen-Id bleibt `#tab-table`): neueste zuerst, Werte in Ampelfarbe (Blutdruck per Wert
+  `catVal`, Zeilenpunkt = schlechterer). Zeile → **Detail** (`showDetail`/`findRecord`, `renderDetail` bzw.
+  `renderVitalDetail`): großer Wert in Ampelfarbe, Ampel-Skala, Kontext, Notiz, Bearbeiten → Erfassen, Löschen →
+  `askConfirm`. Beim Sauerstoff ein sachlicher Hinweis (kalte Finger, Nagellack, Bewegung).
+- **Diagramm Blutdruck** (`renderChart`/`buildDiagChart`, SVG): Sys/Dia/Beide + Puls-Umschalter, Ampel-Farbpunkte,
+  gestrichelte Ø-Linie, keine Schwellen-Linien. Der Puls-Umschalter baut nur die Puls-Ebene ein/aus
+  (`setDiagPulseLayer`/`diagPulseLayer`), Sys/Dia spielen ihre Animation nicht erneut ab.
+- **Diagramm Temperatur/Sauerstoff** (`renderMetricChart`/`buildMetricChart`): eigene Grafik mit **zeitgetreuer
+  Achse**, Ampel-Punkte (`catMetric`), Ø-Linie, Mindest-Spanne der Höhenachse; Sys/Dia/Puls-Knöpfe ausgeblendet.
+- **Ampel Blutdruck:** `catVal(v,y,r)` je Wert, `category(e)` = schlechterer von Sys/Dia.
+
+### Menü (`#menuDlg`, Aussehen A „Verfeinert")
+- **Bottom-Sheet** unten am Bildschirmrand mit Griffleiste, schließt nur bei echtem Tippen auf die Fläche daneben
+  (`e.target===dialog`). Nur der Inhalt scrollt, Kopf und „Menü schließen" bleiben fest.
+- **Reihenfolge:** **Backup · Daten · Zielbereich · Anzeige**, darunter die Karten **Anleitung** („10 Themen") und
+  **App installieren** (`#mInstall`, nur im Handy-Browser sichtbar). Immer nur ein Abschnitt offen.
+- **Jeder Abschnitt ist eine eigene Karte** (`--surf`, Rand, Radius 18 px; geöffnet mit Schatten), Symbol im getönten
+  Quadrat, darunter eine **Stand-Zeile**: Backup = Stand in Ampelfarbe (ausgeblendet, solange Backup offen ist),
+  Daten = Anzahl Messungen, Zielbereich = „Standardwerte"/„Eigene Werte", Anzeige = „Auto · Kobalt".
+- Größere Schrift, Blocküberschriften in normaler Schreibweise, Knöpfe mindestens 44–48 px hoch.
+- `openMenu()` frischt alle Stand-Zeilen auf. Wurde der Zielbereich geändert (`_thrChanged`), rechnet beim Schließen
+  `refreshData()` alles neu.
+
+### Backup (Menü-Abschnitt)
+- **Oben: Stand-Block mit Erinnerung** (`backupState`/`renderBackupState`): grün „Alles gesichert", gelb „Seit N Tagen
+  nicht gesichert" mit „Erinnerung in …"/„Erinnerung ist fällig"/„Erinnerung ist aus". Darunter „Erinnerung" mit
+  **− / +** (`stepReminder`, 0–30 Tage). Hängt an `settings.firstDirtyAt` und `settings.reminderDays`. „Gesichert"
+  zählt jedes Backup (`markBackedUp`), weil die App nicht erkennt, wohin eine Datei wirklich geht.
+- **Karte „Automatisches Backup"** (immer dieselbe Datei via File System Access API, nur Chromium, auf dem iPhone
+  ausgegraut). Status grün „Verknüpft: ‹Dateiname›" bzw. rot „Keine Datei verknüpft". Knöpfe: nicht verknüpft
+  **„Neu anlegen"** (`showSaveFilePicker`) / **„Auswählen"**; verknüpft **„Lösen"** / **„Ändern"**. „Auswählen"/„Ändern"
+  nutzen den Öffnen-Dialog und **führen** den Datei-Inhalt mit den App-Daten **zusammen**, bevor verknüpft und
+  zurückgeschrieben wird. Danach schreibt jede Änderung automatisch (`scheduleAutoBackup`/`autoBackupIfLinked`).
+  **Android-Warnung** (gelb, immer wenn `FS_SUPPORTED`): diese Datei nie zusätzlich in der alten App verknüpfen,
+  die würde sie ohne Temperatur und Sauerstoff überschreiben.
+- **Karte „Manuelles Backup":** „Speichern" (Download) / „Wiederherstellen" (.txt oder ältere .json, Statistik
+  „X neu, Y aktualisiert"; Merge-Kern `mergeEntriesFromData`, geteilt mit „Auswählen").
+- **Hinweis** (Info-Symbol): Backups liegen auf diesem Handy, sicher erst an einem zweiten Ort. Darunter breiter Knopf
+  **„Backup teilen"** (Web Share API; klappt das nicht, fragt ein Dialog nach Download).
+- **Format Version 3:** `{app:'blutdruck', version:3, exportedAt, entries, vitals, settings}` (`backupData()`).
+  Gesichert werden nur Vorlieben (`colorDots`, `guideLines`, `theme`, `accent`, `reminderDays`, `thr`, `plusMode`),
+  nicht `firstDirtyAt`/`snoozeUntil`. Ältere Backups (v2, reines Array) bleiben lesbar. Beim Übernehmen der
+  Einstellungen (`applyBackupSettings`) werden die Grenzen **zusammengeführt** (Backup der alten App ohne neue Grenzen
+  setzt nichts zurück). Zwischen den Apps: Alte → Pro und Pro → Pro alles, Pro → alte App nur Blutdruck und
+  Einstellungen (Tabelle in der Vitalwerte-Spezifikation, 6.3).
+- **Einstellungen-Rückfrage** (`#restoreDlg`, `offerSettingsRestore()`): enthält ein Backup Einstellungen, „Werte und
+  Einstellungen übernehmen" / „Nur die Werte übernehmen" (Raustippen/Esc = nur Werte).
+- Kein Lösch-Protokoll: Ein gelöschter Wert, der noch in einer Backup-Datei steht, kann beim Zusammenführen zurückkommen.
+
+### Daten (Menü-Abschnitt)
+- „Als CSV exportieren (Excel)": Spalten `Datum; Uhrzeit; Systolisch; Diastolisch; Puls; Temperatur (°C); SpO2 (%);
+  Notiz`, Dezimalkomma. Darunter `#csvNote` mit der Anzahl je Wert („42 Blutdruck · 7 Temperatur · 7 Sauerstoff").
+- „Arzt-Report (Drucken/PDF)" (`#mReport`).
+- „Alle Daten löschen" löscht `entries` **und** `vitals`; die Rückfrage zählt alle Werte je Art, Pflicht-Häkchen,
+  Hinweis, dass eine Backup-Datei erhalten bleibt.
+- Info-Zeile mit der **Speicherbelegung** (sofern der Browser eine Quota liefert).
+
+### Zielbereich (eigener Menü-Abschnitt)
+Je Wert eine **Ampel-Leiste** mit den Grenzen als Eingabe-Chips an den Übergängen (`THR_ROWS`, `renderThrBars`),
+zusammen **neun Grenzen**. Regel: Jede Zahl gehört zum Bereich rechts davon („ab"). Temperatur mit
+`inputmode="decimal"` (Komma und Punkt), sonst `numeric`. Prüfung (`thrCheck`): Zahlen müssen von links nach rechts
+größer werden – **auch beim Blutdruck** –, Sauerstoff höchstens 100. Fehlermeldung erst bei fertig aussehender Eingabe;
+beim Verlassen eines ungültigen Felds zurück auf den alten Wert + Hinweis-Toast. „Standardwerte wiederherstellen"
+setzt alle neun zurück.
+
+### Anzeige (Menü-Abschnitt)
+„Design" (Hell/Dunkel/Auto mit Symbolen + Akzentfarben-Raster) und „Neue Messung (Plus-Button)" (A/B/C mit
+Mini-Bild, gilt sofort beim Antippen wie die Akzentfarbe).
+
+### Anleitung (`#helpDlg`)
+**10 Themen zum Aufklappen** (immer nur eins offen, das geöffnete rutscht nach oben; `openHelp`/`closeHelpTopics`),
+Wortlaut vom Nutzer abgestimmt: Werte eintragen · Plus-Button · Dashboard · Farben und Zielbereich · Verlauf und
+Diagramm · Backup: nichts verlieren · Wiederherstellen und neues Handy · Daten · Aussehen · App installieren. Der
+Backup-Text sagt richtig, dass Backups erst an einem **zweiten Ort** verlustsicher sind („Backup teilen"), und
+enthält die Android-Warnung. Unten „‹ Zurück" (ins Menü) und „Menü schließen".
+
+### Arzt-Report (Druck/PDF)
+Aufbereiteter, **druckbarer** A4-Bericht für den Arztbesuch. **Reine Datenaufbereitung, keine Diagnose/Bewertung.**
+Einstiege: Icon im Diagramm-Kopf (`#rpOpenChart`) und Menü → Daten (`#mReport`), beide `openReport()`.
+- **Report-Menü** (Vollbild-Screen `#tab-report`): Zeitraum 30/90/Eigener, Report-Farbe (5 Swatches), Schalter
+  **Namensfeld**, **Puls einbeziehen**, **Temperatur & Sauerstoff einbeziehen** (Standard an) und
+  **Anhangseite(n) drucken**, verkleinerte Live-Vorschau, Knöpfe **„Drucken"** und **„Als Datei teilen"**. Das Menü
+  folgt dem App-Theme, die A4-Seiten sind **immer hell**.
+- **Seiten:** Seite 1 „Kompakt" Blutdruck (`rpPage`) · Seite 2 „Temperatur & Sauerstoff" (`rpVitalPage`, entfällt
+  ohne Werte im Zeitraum) · Anhang Blutdruck im Querformat (`rpLandscape`) · Anhang Temperatur & Sauerstoff im
+  Querformat (`rpVitalLandscape`, beide Werte auf einer Seite, gemeinsame Datumsachse). Reihenfolge über `rpPages`.
+- **Technik:** `reportData`/`reportVitals` bündeln die Kennzahlen aus vorhandener Logik, eigener Bereichsfilter
+  (nicht `filters`). Feste helle Palette `RP`, eigene Grafiken (`rpChart`, `rpMetricChart`, `rpVitalChartDetail`).
+  `reportState` ist **bewusst flüchtig** (bei jedem Öffnen Standard, nichts in `settings`/Backup). Druck über
+  `@media print` mit **benannten `@page`** (hoch + quer), jede weitere Seite auf neuem Blatt.
+- **„Als Datei teilen"** (`rpShareFile`): eigenständige HTML-Datei mit eingebetteter Schrift, per Web Share, sonst
+  Download. Ersatzweg, weil **unbestätigt** ist, ob `window.print` in der installierten iPhone-App druckt.
+- Grenzwerte liest der Report aus `settings.thr`; geändert wird unter **Menü → Zielbereich**.
+
+### Installations-Assistent (`#instDlg`)
+- Erscheint beim Start **nur im Handy-Browser** (`IS_IOS`/`IS_ANDROID`, nicht in der installierten App, nicht am PC),
+  als modales Vollbild-Fenster (App dahinter gesperrt). „Später" schließt, beim nächsten Start kommt er wieder; im
+  Menü öffnet „App installieren" ihn erneut. Funktionen `instOpen`/`instRender`/`instInstall`/`instCopy`/`initInstall`.
+- **iPhone/Safari:** 3 Schritte über die **Safari-Teilen-Taste** (Pfeil zur Safari-Leiste), dann „Fast geschafft".
+  Der Weg über `navigator.share` ist **bewusst nicht gebaut** (unbestätigt). **Anderer Browser/In-App:** „Öffne diese
+  Seite bitte in Safari" + „Link kopieren".
+- **Android:** „Installieren" → `beforeinstallprompt`; ohne Ereignis der Weg übers Browser-Menü; danach „Installiert".
+- **Erster Start der installierten App ohne Werte:** Angebot „Hast du schon Werte?" → Backup-Datei einlesen (Merker
+  `localStorage['bpp_import_offered']`).
+
+### App-Icon und iPhone-Feinschliff
+- **App-Icon 7a** (Nachtblau, schmale weiße PRO-Pille): `icon-192/512.png` (abgerundet, `purpose any`),
+  `icon-maskable-192/512.png` (vollflächig), `apple-touch-icon.png` (180×180), Header-Logo als `SVG_ICON` in app.js.
+- **Meta-Tags** in `index.html`: `apple-mobile-web-app-capable` (+ `mobile-web-app-capable`),
+  `apple-mobile-web-app-title` „Blutdruck Pro", `apple-mobile-web-app-status-bar-style` `default` (die App hat eigene
+  helle und dunkle Flächen), `theme-color` je Modus (siehe Design-Tokens). Wie das auf dem iPhone wirkt, ist **erst
+  am Gerät sicher**.
+- **Manifest:** `theme_color` und `background_color` `#eef1f6` (heller App-Hintergrund, z. B. Startbild auf Android).
+
+### Allgemeine Bausteine
+- **Speicher:** Messwerte und Einstellungen in der Browser-Datenbank (IndexedDB, Stores `entries`, `vitals`, `meta`),
+  `localStorage` als Spiegel/Fallback mit einmaliger automatischer Migration. Einstellungen im `meta`-Store unter
+  `'settings'` (`idbGetMeta`/`idbSetMeta`). Speichern ist zweigeteilt: `persistSettings()` (nur ablegen) vs.
+  `saveSettings()` (ablegen **+** Auto-Backup planen) – interne Buchhaltung (`markDirty`/`markBackedUp`/Snooze) nutzt
+  bewusst `persistSettings()`, sonst entstünde eine Endlosschleife. Beim Start `navigator.storage.persist()`.
+- **Zoom-Schutz (Mobil):** Eingabefelder mind. 16 px Schrift, `*{touch-action:manipulation}` gegen Doppeltipp-Zoom.
+  Zwei-Finger-Zoom bleibt erlaubt (Barrierefreiheit).
+- **Nicht unterstützte Funktionen** werden nicht versteckt, sondern **ausgegraut** mit kurzer Begründung.
+- **Speicher voll** (QuotaExceededError): Hinweis statt stillem Fehlschlag (`quotaToast`).
+- **Meldungen (Toasts):** `toast(msg, kind)` mit `kind ∈ success | notice | error`, 4 s sichtbar, per Wischen
+  schließbar. Bei offenem Fenster wird der Toast **in das Fenster** gerendert (sonst wäre er „inert"), beim Schließen
+  wandert er zurück in den Body.
+- **Bestätigen-Dialoge (`askConfirm`, `#confirmDlg`):** ein gestaltbarer Dialog statt Browser-`confirm()`, Promise →
+  `true`/`false`. Optionen u. a. `icon`/`tone`, `title`, `message` oder `messageHTML`, `confirmLabel`/`cancelLabel`,
+  `danger`, `previewHTML`, `detailsText`, `noteText`, `requireCheck`. Aufrufe: Eintrag löschen (Detail),
+  Teilen-Fallback (`shareBackup`), Alle Daten löschen (`clearAllData`). `#confirmDlg` steht im HTML **nach** den
+  anderen Fenstern (Toast-im-Dialog). Aufräumen von `#confirmExtra` beim **Aufbau**, nicht im `close`-Handler.
+- **Obsolet, aber im Backup behalten:** `colorDots` und `guideLines` (Schalter entfallen, Rückwärtskompatibilität).
 
 ## Namens-Konvention (Backup vs. CSV)
 „Backup …" = vollständige Sicherung/Wiederherstellung (Dateiendung **.txt**, Inhalt JSON, originalgetreu;
@@ -217,106 +282,61 @@ Der Nutzer ist **Programmier-Anfänger**. Deshalb:
 
 ## Geparkte Aufgaben
 
-Stand 2026-07-11: Der UI/UX-Block ist umgesetzt (siehe „Aktueller Stand"); der Rest gegen die
-Codebase geprüft.
-Nachtrag 2026-07-12: Fünf weitere Aufgaben geparkt (Medikamenten-Erinnerung + Einnahme-Tracking,
-Anleitungs-Textkorrektur, Puls-Linien-Animation, Akzentfarben pro Modus) – siehe unten in „2. Weitere
-Features", markiert mit *(neu geparkt 2026-07-12)*.
-Nachtrag 2026-07-13: Puls-Linien-Animation und Akzentfarben pro Modus umgesetzt (siehe „Aktueller
-Stand") und unten entfernt; die übrigen drei aus dem 2026-07-12-Batch (Medikamenten-Erinnerung,
-Einnahme-Tracking, Anleitungs-Textkorrektur) bleiben geparkt.
-Nachtrag 2026-07-14: Arzt-Report (Druck/PDF) umgesetzt (siehe „Aktueller Stand") und aus „2. Weitere
-Features" entfernt.
+Stand 2026-11-08: Der Umbau „Temperatur & Sauerstoff" (Schritte 1–10) ist fertig, inklusive neuem Dashboard, Menü,
+Anleitung, Icon, Installations-Assistent, Arzt-Report-Seiten und iPhone-Feinschliff.
 *Legende — Aufwand: klein / mittel / groß · Machbarkeit: problemlos / mit Hürde / heikel.*
 
-### 1. UI/UX-Modernisierung — **erledigt (Stufen 1–6, 2026-07-11)**
-Komplett umgesetzt (Details unter „Aktueller Stand"): Design-Tokens/Dark Mode/Akzentfarben, neue
-Tab-Bar + Dashboard, geführte Erfassen-Eingabe, Verlauf-Liste + Detail-Screen, entschlacktes Diagramm
-(Variante A), Menü als Bottom-Sheet mit „Anzeige" (Zielbereich + Design). Verlauf und Diagramm teilen
-sich jetzt **denselben Zeitraum** (`applyVerlaufRange` + `filters.from/to`).
+### 1. Gerätetests (macht der Nutzer, Claude hat kein iPhone)
+- **iPhone und Android** nach der Geräte-Checkliste aus der Abschluss-Sitzung (2026-11-08): Assistent bis zur
+  Installation, Start im Flugmodus, Statusleiste/Ränder/Icon hell und dunkel, Backup teilen → wiederherstellen,
+  Arzt-Report drucken bzw. „Als Datei teilen" → PDF, Umzug von der alten App, beide Apps parallel.
+- Dabei die drei offenen Fragen klären (Teilen-Menü, Safari-Daten in der App, `window.print` in der App) und
+  danach anpassen. Danach `iphone-test/` löschen (nur nach Rückfrage).
 
-**Offen geblieben (bewusst zurückgestellt):**
-- **Detail-Filter + Sortierung wieder einbauen** — mittel · mit Hürde. Der Verlauf hat heute nur den
-  **Zeitraum**-Filter (7/30/90 + Von–Bis), wie im Entwurf. Die frühere Tabelle konnte zusätzlich nach
-  **Wertebereichen** (Sys/Dia/Puls min–max) und **Notiz-Text** filtern und nach Spalten **sortieren**.
-  Die geteilte Filter-Basis existiert noch (`filters` mit `sysMin/…/note`, `getFiltered`) – es fehlt nur
-  die Bedienoberfläche. Bei Wiedereinführung an **beide** Ansichten (Verlauf + Diagramm) denken (ein
-  geteiltes Panel bzw. Klassen statt fester `#f_*`-IDs); die im Abschluss entfernte `getSorted`-Funktion
-  müsste dann neu angelegt werden.
+### 2. Offen geblieben aus der UI/UX-Modernisierung
+- **Detail-Filter + Sortierung wieder einbauen** — mittel · mit Hürde. Verlauf und Diagramm haben nur den
+  **Zeitraum**-Filter. Die frühere Tabelle konnte nach Wertebereichen (Sys/Dia/Puls min–max) und Notiz-Text filtern
+  und nach Spalten sortieren. Die Filter-Basis existiert noch (`filters` mit `sysMin/…/note`, `getFiltered`), es fehlt
+  die Bedienoberfläche; für Temperatur/Sauerstoff gelten diese Felder noch nicht. Bei Wiedereinführung an **beide**
+  Ansichten denken; `getSorted` müsste neu angelegt werden.
 
-### 2. Weitere Features
-- **Arzt-Report (Druck/PDF)** — **erledigt 2026-07-14** (siehe „Aktueller Stand"). Aufbereiteter,
-  druckbarer A4-Bericht (Kompakt-Layout + Querformat-Anhang) via `window.print` + `@media print`.
+### 3. Weitere Features
 - **Auto-Wiederherstellung** — mittel · mit Hürde. Beim Start, wenn App leer **und** Datei verknüpft
   (`idbGetMeta('backupHandle')`): Berechtigung prüfen → bei `granted` lesen + `mergeEntriesFromData`.
-  *Hürde:* Datei-Berechtigung erlischt oft nach Browser-Neustart und braucht eine Nutzer-Geste →
-  Fallback-Knopf nötig.
-  *Voraussetzung – Lösch-Protokoll (Tombstones):* Schon heute kann der Merge gelöschte Einträge
-  zurückbringen; beim automatischen Start-Merge wäre das besonders störend. Daher gelöschte IDs
-  protokollieren, damit sie beim Zusammenführen nicht wieder auftauchen.
-- **Vollständige App-Dokumentation** — mittel · problemlos. Quelle ist die **gesamte Codebase**
-  ([index.html](index.html), [styles.css](styles.css), [app.js](app.js), `sw.js`,
-  `manifest.webmanifest`). Zwei Teile:
-  - *Anwender-Teil:* alle Funktionen aus Nutzersicht + Tipps/Best Practices.
-  - *Technischer Teil:* nur die **wichtigsten, miteinander verknüpften** Funktionen, sodass
-    Abhängigkeiten und Prozessflows erkennbar werden (z. B. `saveEntries → idbWriteAll →
-    scheduleAutoBackup → autoBackupIfLinked → writeToHandle`; geteilter Merge-Kern
-    `mergeEntriesFromData`; Start-Sequenz `init → requestPersistence → initStorage`).
-  - *Visualisierung:* Flows als **Grafiken** (build-frei, z. B. Mermaid in Markdown; Alternative SVG).
-  Danach kann diese CLAUDE.md auf reinen Projektkontext verschlankt werden.
-- **Medikamenten-Erinnerung (Einnahme)** *(neu geparkt 2026-07-12)* — groß · heikel. Zu einer festen
-  Uhrzeit eine **echte Handy-Benachrichtigung** auslösen (mit **Ton** und Eintrag im
-  Benachrichtigungs-Menü / „Pull-down"), auch wenn die App gerade **nicht offen** ist.
-  *Kernhürde:* Eine reine PWA **ohne Server** kann eine zeitgesteuerte Benachrichtigung im **Hintergrund**
-  **nicht zuverlässig** garantieren. Bausteine/Wege (Verfügbarkeit **vor** der Umsetzung prüfen):
-  - **Benachrichtigungs-Erlaubnis** (`Notification.requestPermission`) + Service Worker
-    (`registration.showNotification`) – Grundlage für jede Variante.
-  - **Zeit-Auslöser lokal:** eine geplante Benachrichtigung ohne Server (Notification-Trigger,
-    `TimestampTrigger`) wäre ideal, ist aber experimentell und **nicht überall** verfügbar (v. a.
-    iOS/Safari stark eingeschränkt) → unsicher.
-  - **Web Push** (mit Server + VAPID-Schlüssel) wäre zuverlässiger, **widerspricht** aber dem Grundsatz
-    „kein Server / kein Build".
-  - Solange die App **offen** ist, geht eine Erinnerung per Timer (`setTimeout`) problemlos – nur eben
-    nicht im Hintergrund. Für eine „wecker-echte" Erinnerung bräuchte es evtl. eine **native Hülle**
-    (TWA/Capacitor) → großer Schritt weg von der reinen PWA.
-  - **Vorgehen:** zuerst **Machbarkeit klären**, dann Umfang festlegen (ggf. Android/Chromium zuerst,
-    iOS später bzw. eingeschränkt), inkl. Bedienoberfläche für Uhrzeit(en)/Dosis.
-- **Einnahme-Tracking** *(neu geparkt 2026-07-12 – Erweiterung der Medikamenten-Erinnerung)* — mittel ·
-  problemlos (für sich allein). Festhalten, **ob die Medikamente heute schon genommen** wurden
-  (Status „genommen/offen", Abhaken, kleiner Verlauf). Reine Daten + Bedienoberfläche und passt zum
-  bestehenden Muster (eigener Bereich in der Browser-Datenbank (IndexedDB), ins Backup aufnehmen). Hängt
-  inhaltlich an der Erinnerung, ist aber **technisch unabhängig** umsetzbar (auch ohne Hintergrund-
-  Benachrichtigung nutzbar).
-- **Anleitungs-Text: Backup-Sicherheit richtigstellen** *(neu geparkt 2026-07-12)* — klein · problemlos.
-  Der Hilfe-Text (`helpDlg` in [index.html](index.html)) suggeriert, dass Automatisches/Manuelles Backup
-  vor **Geräteverlust** schützt. Das stimmt nicht: Die Backup-Datei liegt weiterhin **nur auf dem Handy**.
-  Erst **„Backup teilen"** und Ablage an einem **dritten Ort** (NAS, Google Drive o. Ä.) ist wirklich
-  verlustsicher. Text entsprechend **korrigieren/ergänzen** (evtl. zusätzlich ein kurzer Hinweis direkt in
-  der Backup-Sektion des Menüs).
+  *Hürde:* Datei-Berechtigung erlischt oft nach Browser-Neustart und braucht eine Nutzer-Geste → Fallback-Knopf nötig.
+  *Voraussetzung – Lösch-Protokoll (Tombstones):* gelöschte IDs protokollieren, damit sie beim Zusammenführen nicht
+  wieder auftauchen.
+- **Vollständige App-Dokumentation** — mittel · problemlos. Quelle ist die gesamte Codebase (`index.html`,
+  `styles.css`, `vitals.js`, `app.js`, `sw.js`, `manifest.webmanifest`). *Anwender-Teil:* alle Funktionen + Tipps.
+  *Technischer Teil:* die wichtigsten verknüpften Abläufe (z. B. `saveEntries → idbWriteAll → scheduleAutoBackup →
+  autoBackupIfLinked → writeToHandle`; Merge-Kern `mergeEntriesFromData`; Start `init → requestPersistence →
+  initStorage`). *Visualisierung:* Flows als Grafiken (build-frei, z. B. Mermaid). Danach kann diese CLAUDE.md
+  verschlankt werden.
+- **Medikamenten-Erinnerung (Einnahme)** — groß · heikel. Zu einer festen Uhrzeit eine **echte Handy-Benachrichtigung**
+  (Ton, Benachrichtigungs-Menü), auch wenn die App nicht offen ist. *Kernhürde:* Eine reine PWA **ohne Server** kann
+  das im Hintergrund **nicht zuverlässig**. Bausteine: Benachrichtigungs-Erlaubnis + Service Worker
+  (`showNotification`); lokaler Zeit-Auslöser (`TimestampTrigger`) experimentell und nicht überall (v. a. iOS);
+  Web Push bräuchte Server + VAPID (widerspricht „kein Server"); bei offener App geht ein Timer; „wecker-echt" evtl.
+  nur mit nativer Hülle (TWA/Capacitor). **Vorgehen:** zuerst Machbarkeit klären, dann Umfang festlegen.
+- **Einnahme-Tracking** — mittel · problemlos. Festhalten, ob die Medikamente heute genommen wurden (genommen/offen,
+  Abhaken, kleiner Verlauf). Eigener Bereich in der Browser-Datenbank, ins Backup aufnehmen. Technisch unabhängig von
+  der Erinnerung umsetzbar.
 
-### 3. Zurückgestellt (niedrige Priorität)
-- **Umbau Stufe 2 – JS in Module** (`storage.js`/`backup.js`/`chart.js`/`ui.js`, eingebunden per
-  `<script type="module">`) — mittel · problemlos (kein Logikwechsel, aber Sorgfalt wegen vieler
-  gegenseitiger Abhängigkeiten, allen voran Backup/Auto-Backup und Einstellungen/Theme, die quer
-  durch mehrere künftige Module greifen würden). War bisher an Profile gekoppelt, damit Speicher/
-  Backup nicht zweimal umgebaut werden – dieser Grund entfällt, da Profile gestrichen ist. Bleibt
-  für sich genommen sinnvoll: `app.js` ist mit ~1360 Zeilen (nach der UI-Modernisierung deutlich
-  gewachsen) nicht mehr ganz so überschaubar und würde mit jeder
-  weiteren Funktion unübersichtlicher, und eine Aufteilung nach Zuständigkeit passt zum bisherigen
-  Vorgehen (siehe Stufe 1). Keine neue technische Hürde durch `type="module"`: Die App verlangt als
-  PWA ohnehin einen http(s)/localhost-Kontext (wegen des Service Workers), das sonst übliche
-  `file://`-CORS-Problem von ES-Modulen entsteht also nicht zusätzlich; `sw.js` müsste nur um die
-  neuen Modul-Dateien ergänzt werden. Ohne Team aber ohne Zeitdruck – zurückstellen, bis entweder
-  `app.js` spürbar unhandlich wird oder ohnehin größere Eingriffe an Speicher/Backup anstehen.
-  (Stufe 1 – CSS & JS auslagern – ist erledigt, siehe „Aktueller Stand".)
+### 4. Zurückgestellt (niedrige Priorität)
+- **JS in Module aufteilen** (`storage.js`/`backup.js`/`chart.js`/`ui.js`, `<script type="module">`) — mittel ·
+  problemlos, aber Sorgfalt wegen vieler gegenseitiger Abhängigkeiten (Backup/Auto-Backup, Einstellungen/Theme).
+  `vitals.js` ist schon ausgelagert; `app.js` hat inzwischen ~2535 Zeilen. Kein `file://`-Problem, weil die PWA
+  ohnehin http(s)/localhost braucht; `sw.js` müsste um die neuen Dateien ergänzt werden. Zurückstellen, bis `app.js`
+  spürbar unhandlich wird oder größere Eingriffe an Speicher/Backup anstehen.
 
-### 4. Gestrichen (geprüft 2026-06-30)
-- **CSV-Import** — redundant zu „Backup → Wiederherstellen"; CSV hat keine `id` → Dubletten,
-  fehleranfälliges Datums-Parsen. (CSV-**Export** bleibt, ist fertig.)
-- **Personalisierung (Alter/Fitness → Zielwerte)** — manueller Schwellenwert-Editor (`settings.thr`)
-  deckt den Bedarf ab; automatische Ableitung medizinisch heikel.
-- **Backup-teilen-Logik prüfen** — erledigt: „teilen", „speichern" und Auto-Backup bauen ihre Datei
-  **immer frisch aus `entries`** (`backupBlob`); keine Mehrdeutigkeit zwischen mehreren Dateien.
-- **Profile** (mehrere Personen, eigene Backup-Datei je Profil) — Grundsatzentscheidung getroffen
-  (2026-07-01): wird nicht umgesetzt. War nie über die Doku hinaus begonnen, kein Code betroffen.
-  „Umbau Stufe 2" war an dieses Vorhaben gekoppelt und ist oben entsprechend angepasst.
+### 5. Bewusst nicht enthalten / gestrichen
+- **Bewusst nicht enthalten:** Messort bei der Temperatur · Puls beim Sauerstoff · Apple Health und Bluetooth (auf dem
+  iPhone nur mit nativer App) · Fahrenheit · gemeinsames Diagramm aller Werte.
+- **CSV-Import** — redundant zu „Backup → Wiederherstellen"; CSV hat keine `id` → Dubletten, fehleranfälliges
+  Datums-Parsen. (CSV-**Export** bleibt.)
+- **Personalisierung (Alter/Fitness → Zielwerte)** — der Zielbereich-Editor (`settings.thr`) deckt den Bedarf ab;
+  automatische Ableitung medizinisch heikel.
+- **Profile** (mehrere Personen) — Grundsatzentscheidung 2026-07-01: wird nicht umgesetzt.
+- **Erledigt und deshalb ausgetragen:** Arzt-Report (2026-07-14, Seiten für Temperatur & Sauerstoff 2026-11-08),
+  Anleitungs-Text „Backup-Sicherheit richtigstellen" (mit der neuen Anleitung 2026-11-07), Backup-teilen-Logik
+  geprüft (Dateien werden immer frisch aus den Daten gebaut, `backupBlob`).

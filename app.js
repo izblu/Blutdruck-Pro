@@ -1195,7 +1195,8 @@ function animateDashboard(){
   nums.forEach(n=>{ n.el.textContent='0'; });
   const dur=680,t0=performance.now(),ease=p=>1-Math.pow(1-p,3);
   const tick=now=>{
-    const p=Math.min(1,(now-t0)/dur),e=ease(p);
+    // Der erste Frame-Zeitstempel kann knapp VOR t0 liegen → nie unter 0 (sonst kurz „-1" statt „0").
+    const p=Math.max(0,Math.min(1,(now-t0)/dur)),e=ease(p);
     nums.forEach(n=>{ n.el.textContent=Math.round(n.to*e); });
     if(p<1) dashRAF=requestAnimationFrame(tick);
   };
@@ -1621,6 +1622,17 @@ function applyTheme(){
   if(t==='auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme',t);
   applyAccent();
+  applyThemeColor();
+}
+/* Statusleiste (theme-color): Im HTML stehen zwei Tags mit media (hell/dunkel nach dem Handy).
+   Bei „Auto" gilt dieser Wert aus dem HTML. Bei fest „Hell"/„Dunkel" bekommen beide Tags den
+   aktuellen App-Hintergrund (--bg), sonst passte die Leiste nicht, wenn das Handy anders steht. */
+function applyThemeColor(){
+  const bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  $$('meta[name="theme-color"]').forEach(m=>{
+    if(!m.dataset.auto) m.dataset.auto=m.content;    // Ausgangswert aus dem HTML merken
+    m.content = settings.theme==='auto' ? m.dataset.auto : (bg||m.dataset.auto);
+  });
 }
 /* Im Auto-Modus dem Systemwechsel folgen: die Struktur-/Ampelfarben schaltet CSS selbst um,
    nur der modus-abhängige Akzentwert muss nachgezogen werden. */

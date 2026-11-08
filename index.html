@@ -3,7 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2563eb">
+<!-- Farbe der Statusleiste (Android, Safari): je Modus der App-Hintergrund (--bg). Bei fest
+     „Hell"/„Dunkel" im Menü setzt applyThemeColor() in app.js beide Tags auf den gewählten Wert. -->
+<meta name="theme-color" content="#eef1f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e131c" media="(prefers-color-scheme: dark)">
+<!-- iPhone: als eigene App ohne Safari-Leisten starten, Name unter dem Symbol, Statusleiste normal
+     (nicht durchsichtig, weil die App eigene helle und dunkle Flächen hat). Wirkung erst am Gerät sicher. -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Blutdruck Pro">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Blutdruck Pro</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">

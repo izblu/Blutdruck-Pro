@@ -1,13 +1,15 @@
 # Vitalwerte – Datenspezifikation
 
-Stand: 2026-11-04, ergänzt 2026-11-07 (Ziffern-Logik, Dashboard, Zielbereich, großes +). Diese Datei beschreibt **was** die App bei Körpertemperatur und
+Stand: 2026-11-04, ergänzt 2026-11-07 (Ziffern-Logik, Dashboard, Zielbereich, großes +), am 2026-11-08 mit dem
+fertigen Code abgeglichen (Umbau Schritte 1–10 erledigt). Diese Datei beschreibt **was** die App bei Körpertemperatur und
 Sauerstoffsättigung (SpO₂) rechnet, speichert und anzeigt – nicht wie es aussieht. Gleiche
 Aufteilung wie die [dashboard-spezifikation.md](dashboard-spezifikation.md):
 
 - **Fix (Logik/Daten):** Datenmodell, Eingabe-Regeln, Berechnung, Zeitfenster, Ampel-Regeln,
   Leerzustände, Backup. Das ist hier festgelegt, damit kein Entwurf an den Datenregeln vorbeigeht.
-- **Offen (Aussehen → Claude Design):** das große +, Anordnung/Hierarchie, Farben, Kachel- und
-  Diagramm-Gestaltung, genaue Text-Formulierungen, App-Icon.
+- **Aussehen (mit Claude Design entschieden und umgesetzt):** das große +, Anordnung/Hierarchie, Farben, Kachel- und
+  Diagramm-Gestaltung, Text-Formulierungen, App-Icon. Die Entwürfe liegen auf der Zeichenfläche; was entschieden
+  wurde, steht in Abschnitt 12.
 
 **Grundsatz wie im ganzen Projekt:** Die App beschreibt nur. Keine Diagnose, keine Bewertung,
 keine Empfehlungen.
@@ -24,7 +26,8 @@ keine Empfehlungen.
 - **Speicher:** eigener Bereich der Browser-Datenbank (IndexedDB-Store `vitals`), dafür steigt
   `DB_VER` auf 2. Vorhandene Daten bleiben beim Umstieg erhalten. Kopie in `localStorage` unter
   `bpp_vitals`, Ablauf wie bei `entries` (`saveEntries`, `initStorage`).
-- **Zeitfenster rollierend ab jetzt**, wie im Dashboard (`ageDays`): „7 Tage" = 0–7, „Vorwoche" = über 7 bis 14.
+- **Zeitfenster rollierend ab jetzt**, wie im Dashboard (`ageDays`): „7 Tage" = 0–7. (Die frühere „Vorwoche" für
+  den Trend entfällt, siehe Abschnitt 3.)
 - **Durchschnitt** = einfacher Mittelwert über alle Werte im Fenster (nicht pro Tag gewichtet).
 - **Rundung und Anzeige:** Temperatur immer mit einer Nachkommastelle und Komma (`36,8 °C`, auch
   `37,0 °C`), Sauerstoff als ganze Zahl (`98 %`).
@@ -104,16 +107,23 @@ Sie liefert Farbe **und** Text, weil Gelb bei der Temperatur zwei Bedeutungen ha
 **Prüfwerte an den Grenzen:** 35,9 Niedrig · 36,0 Normal · 37,4 Normal · 37,5 Erhöht · 38,0 Erhöht ·
 38,1 Fieber · 95 Im Ziel · 94 Niedrig · 93 Niedrig · 92 Zu niedrig.
 
-**Zielbereich (Menü → Zielbereich, eigener Abschnitt seit 2026-11-07):**
+**Zielbereich (Menü → Zielbereich, eigener Menü-Abschnitt seit 2026-11-07, nicht mehr unter „Anzeige"):**
 
 - Je Wert eine Ampel-Leiste, darunter die Grenzen als Eingabe-Chips an den Übergängen, zusammen **neun Grenzen**
-  (Sys 2, Dia 2, Temperatur 3, Sauerstoff 2). Jede Zahl gehört zum Bereich rechts davon („ab"). Eine Änderung wirkt
-  sofort überall.
+  (Sys 2, Dia 2, Temperatur 3, Sauerstoff 2). Jede Zahl gehört zum Bereich rechts davon („ab"). Hinweissatz darunter:
+  „Jede Zahl zählt schon zum Bereich rechts davon: 37,5 °C gilt als „Erhöht". Die Standardwerte sind gängige
+  Richtwerte." Eine gültige Eingabe gilt sofort überall.
 - Temperatur-Felder als Textfeld mit `inputmode="decimal"`. Komma und Punkt zählen beide, damit das
-  Komma der iPhone-Tastatur sicher ankommt.
+  Komma der iPhone-Tastatur sicher ankommt. Die übrigen Felder `inputmode="numeric"`.
 - Die Reihenfolge muss stimmen, **auch beim Blutdruck**: `sysY < sysR`, `diaY < diaR`, `tempLow < tempY < tempR` und
-  `spo2Y < spo2G ≤ 100`. Sonst wird die Eingabe nicht übernommen (rote Zeile, beim Verlassen zurück auf den alten Wert).
-- „Standardwerte wiederherstellen" setzt wie bisher alle Grenzen zurück, also auch die neuen.
+  `spo2Y < spo2G ≤ 100`. Sonst wird die Eingabe nicht übernommen.
+- **Fehlermeldung** (rote Zeile unter der Leiste, Chip rot umrandet) erst, wenn die Eingabe fertig aussieht (Temperatur
+  `NN,N`, sonst 2–3 Ziffern), damit beim Tippen nichts blinkt: „Bitte eine Zahl wie 37,5 eingeben." / „Bitte eine
+  ganze Zahl eingeben." / „Höchstens 100 %." / „Nicht übernommen: Die Zahlen müssen von links nach rechts größer
+  werden." Beim **Verlassen** eines ungültigen Felds springt es auf den alten Wert zurück, dazu der Hinweis-Toast
+  „Nicht übernommen, der alte Wert gilt weiter."
+- „Standardwerte wiederherstellen" setzt alle neun Grenzen zurück.
+- **Stand-Zeile** des Abschnitts im Menü: „Standardwerte", sobald eine Grenze abweicht „Eigene Werte".
 
 **Noch nicht abgesichert, nicht als Tatsache darstellen:** Das sind gängige Richtwerte. Die
 Sauerstoff-Stufen stammen aus Gesundheitsratgebern. Für die Fieber-Grenzen wurde keine offizielle
@@ -132,18 +142,22 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 
 ### 3.1 Kennzahlen je Wert
 - **Letzte Messung:** eigene Karte je Wert (Blutdruck + Puls · Temperatur · Sauerstoff). Zahl mit Einheit in
-  Ampelfarbe, Ampel-Punkt und Ampel-Wort, Zeitpunkt relativ (`relTime`).
+  Ampelfarbe, Ampel-Punkt und Ampel-Wort, Zeitpunkt relativ (`relTime`). Puls in Puls-Farbe ohne Ampel, „–" wenn
+  die Messung keinen Puls hat.
 - **Ø 7 Tage** (rollierend, 168 h, fest): Temperatur auf eine Nachkommastelle, Sauerstoff ganzzahlig. **Erst ab 3
-  Messungen.** Der Ø trägt Ampelfarbe und Ampel-Wort (`catMetric` auf dem gerundeten Ø).
+  Messungen** (`DASH_MIN`). Der Ø trägt Ampelfarbe und Ampel-Wort (`catMetric` auf dem gerundeten Ø; Blutdruck
+  `category()` auf den gerundeten Ø-Werten). Puls: Ø ohne Ampel, eigene Zählung (Messungen ohne Puls zählen nicht).
 - **Kein Trend, keine Anzahl „im Ziel", keine Grafik** (Verläufe gehören in den Tab „Diagramm").
+- **Antippen:** Karte „Letzte Messung" → Detail dieser Messung; Karte „Letzte 7 Tage" → Diagramm mit diesem Wert,
+  Zeitraum 7 Tage.
 
 ### 3.2 Leerzustände
 | Lage | Anzeige |
 |---|---|
 | Noch kein Wert dieses Typs | Karte „Letzte Messung" mit „Noch kein Wert" |
-| 1–2 Messungen in 7 Tagen | „Zu wenige Messungen · Ø erst ab 3 Messungen" |
-| Keine Messung in 7 Tagen | „Keine Messung in den letzten 7 Tagen", die letzte Messung bleibt oben sichtbar |
-| Gar keine Werte | Wie bisher „Noch keine Messung erfasst." |
+| 1–2 Messungen in 7 Tagen | „Zu wenige Messungen · Ø erst ab 3 Messungen" (Puls nur „Zu wenige Messungen") |
+| Keine Messung in 7 Tagen | „Keine Messung · in den letzten 7 Tagen", die letzte Messung bleibt oben sichtbar |
+| Gar keine Werte | „Noch keine Messung erfasst." mit Hinweis auf das + |
 
 ---
 
@@ -202,8 +216,9 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 - Akzeptiert auch Backups ohne Blutdruck-Werte. Ungültig ist eine Datei erst, wenn **beide** Listen keinen gültigen Eintrag haben.
 - **Gültiger Vitalwert:** bekannter `type`, Zahl als `value`, lesbares `ts`, beim Sauerstoff höchstens 100. Ungültige
   Einträge werden übersprungen.
-- **Grenzen beim Übernehmen der Einstellungen:** Fehlen sie im Backup (Backup der alten App), bleiben die
-  aktuellen Werte erhalten. Heute würde `applyBackupSettings` sie auf den Standard zurücksetzen.
+- **Grenzen beim Übernehmen der Einstellungen:** `applyBackupSettings` führt sie zusammen (Standard ← aktuelle Werte ←
+  Backup). Fehlen sie im Backup (Backup der alten App), bleiben die aktuellen Werte erhalten. `plusMode` wird mit
+  übernommen, ein unbekannter Wert wird zu `'c'`.
 - Wie beim Blutdruck gibt es kein Lösch-Protokoll: Ein gelöschter Wert, der noch in der Datei steht, kann
   beim Zusammenführen zurückkommen.
 
@@ -216,8 +231,17 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 | Pro-Backup nur mit neuen Werten → alte App | Meldung „ungültige Datei", nichts geht kaputt |
 
 **Achtung Android:** Beim automatischen Backup nie dieselbe Datei in beiden Apps verknüpfen. Die alte App würde
-sie sonst ohne Temperatur und Sauerstoff überschreiben. Dieser Hinweis steht in der Anleitung **und im Menü** (Karte
-„Automatisches Backup", immer wenn das automatische Backup verfügbar ist).
+sie sonst ohne Temperatur und Sauerstoff überschreiben. Dieser Hinweis steht an **zwei** Stellen (Wunsch des Nutzers;
+ursprünglich war nur die Anleitung geplant):
+
+- **Menü → Backup**, Karte „Automatisches Backup": gelbes Warn-Dreieck mit „Diese Datei nie zusätzlich in der alten
+  Blutdruck-App verknüpfen. Sie würde die Datei ohne Temperatur und Sauerstoff überschreiben." Sichtbar, **sobald das
+  automatische Backup verfügbar ist** (`FS_SUPPORTED`), verknüpft oder nicht, also auch schon beim Verknüpfen. Auf
+  dem iPhone gibt es das automatische Backup nicht, die Karte bleibt ausgegraut und ohne Warnung.
+- **Anleitung**, Thema „Backup: nichts verlieren": gelber Kasten „Achtung Android".
+
+Daneben steht im Backup-Abschnitt der Hinweis, dass Backups erst an einem **zweiten Ort** (Cloud, Mail, Computer)
+sicher vor Verlust sind.
 
 ### 6.4 Löschen
 „Alle Daten löschen" löscht auch `vitals`, die Meldungen zählen alle Werte zusammen.
@@ -235,28 +259,38 @@ sie sonst ohne Temperatur und Sauerstoff überschreiben. Dieser Hinweis steht in
 
 ## 8. Arzt-Report
 
-Die Details kommen in die [arzt-report-spezifikation.md](arzt-report-spezifikation.md), wenn der Report umgebaut wird. Fest ist:
+Umgesetzt 2026-11-08, Einzelheiten in der [arzt-report-spezifikation.md](arzt-report-spezifikation.md) (Abschnitte 9
+und 10). Kurz:
 
-- **Schalter „Temperatur & Sauerstoff einbeziehen":** Beim Öffnen aus, flüchtig wie der übrige `reportState`. Gibt es im
-  Zeitraum keine solchen Werte, ist er ausgegraut mit kurzer Begründung.
-- **Eigene A4-Seite:** je Wert Ø mit Ampel-Text, Min/Max, Anzahl und Verlauf, dazu eine Wertetabelle und die angewendeten
-  Grenzen. Fehlt ein Wert im Zeitraum, steht dort „—".
+- **Schalter „Temperatur & Sauerstoff einbeziehen":** Standard **an**, flüchtig wie der übrige `reportState`. Die
+  Unterzeile zählt die Werte im Zeitraum; ohne Werte entfällt die Seite („Keine Werte im Zeitraum").
+- **Eigene A4-Seite** (Seite 2): je Wert Ø mit Ampel-Wort, Tiefst–Höchst, Anzahl und Verlauf, dazu die Werteliste und
+  die angewendeten Grenzen. Fehlt ein Wert im Zeitraum, steht dort „Keine Werte im Zeitraum." bzw. „—" in der Tabelle.
+- **Anhang im Querformat** für Temperatur & Sauerstoff (beide auf einer Seite), zusammen mit dem Blutdruck-Anhang über
+  „Anhangseiten drucken".
 - **Seite 1 und `reportData` bleiben unverändert.**
-- **Druckweg noch offen:** Er hängt vom iPhone-Test ab (Test 3). Klappt `window.print()` in der installierten App
-  nicht, teilt die App den Bericht als eigene Datei.
+- **Druckweg:** „Drucken" (`window.print`) und daneben **„Als Datei teilen"** (eigenständige HTML-Datei). Ob
+  `window.print()` in der installierten iPhone-App den Druckdialog öffnet und ob die geteilte Datei sich als PDF
+  drucken lässt, ist **unbestätigt** und gehört in die Gerätetests.
 
 ---
 
 ## 9. Das große + (alle drei wählbar)
 
-Entschieden 2026-11-07: Alle drei Varianten sind wählbar unter Menü → „Anzeige" → „Neue Messung (Plus-Button)",
-**Standard C**. Vorliebe `settings.plusMode` (`'a'|'b'|'c'`, fehlend oder unbekannt → `'c'`), kommt ins Backup.
+Entschieden 2026-11-06 zunächst nur C, am 2026-11-07 erweitert: **Alle drei Varianten sind wählbar, Standard C.**
+Ort: Menü → „Anzeige" → Block „Neue Messung (Plus-Button)", der **zweite Block unter „Design"** (seit der Zielbereich
+ein eigener Menü-Abschnitt ist). Vorliebe `settings.plusMode` (`'a'|'b'|'c'`, fehlend oder unbekannt → `'c'`), gilt
+**sofort beim Antippen** wie die Akzentfarbe (kein Übernehmen-Knopf) und kommt ins Backup. Die alte App kennt den
+Schlüssel nicht und übernimmt ihn einfach nicht.
 
-| | Name im Menü | Ablauf |
-|---|---|---|
-| A | Erst wählen | Auswahl-Blatt Blutdruck · Temperatur · Sauerstoff, danach die Eingabe |
-| B | Direkt starten | Eingabe Blutdruck, oben ein Umschalter zu Temperatur und Sauerstoff |
-| C | Alles nacheinander | Sys → Dia → Puls → Temperatur → Sauerstoff, was fehlt, wird übersprungen |
+| | Name im Menü | Satz im Menü | Ablauf |
+|---|---|---|---|
+| A | Erst wählen | „Nach dem + wählst du, was du misst." | Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff, danach die Eingabe |
+| B | Direkt starten | „Startet mit Blutdruck. Oben wechselst du den Wert." | Eingabe Blutdruck, oben ein Umschalter zu Temperatur und Sauerstoff |
+| C | Alles nacheinander | „Alle Werte in einem Durchgang. Was fehlt, überspringst du." + Pille „Standard" | Sys → Dia → Puls → Temperatur → Sauerstoff, was fehlt, wird übersprungen |
+
+Jede Wahlzeile zeigt ein kleines Bild des Bildschirms, Name, Satz und rechts den Häkchen-Kreis. Das große + ruft
+`openPlus()` auf, das nach `plusModeNow()` verzweigt. Die Anleitung erklärt die drei Wege im Thema „Plus-Button".
 
 **Das Datenmodell bleibt bei allen gleich.** Bearbeiten öffnet immer nur die Felder des einen Datensatzes. Bei C:
 Jeder ausgefüllte Wert wird ein eigener Datensatz mit gleichem `ts`, leere Felder erzeugen keinen Datensatz, und die
@@ -267,22 +301,22 @@ Neue Blätter müssen über `navPush` laufen und in `NAV_SHEETS` stehen, damit d
 
 ---
 
-## 10. Stellen im Code, die heute nur Blutdruck kennen
+## 10. Stellen im Code, die früher nur Blutdruck kannten (erledigt 2026-11-07)
 
-Damit beim Umbau nichts übersehen wird:
+Checkliste für den Umbau, **alle Punkte umgesetzt**. Bleibt als Nachschlage-Liste, wo die neuen Werte angeschlossen sind:
 
-| Stelle | Was sich ändert |
+| Stelle | Was sich geändert hat |
 |---|---|
-| `openDB`, `initStorage` | Neuer Store und Laden von `vitals` |
-| `renderDashboard` | Bricht heute ab, wenn `entries` leer ist. Das darf die neuen Bereiche nicht mehr verhindern |
-| `meanKey`, `trendChip` | Runden auf ganze Zahlen bzw. zeigen Rohzahlen, die Temperatur braucht eine Nachkommastelle |
-| `animateDashboard` | Das Hochzählen rundet und kennt kein Komma, für die Temperatur nicht so verwenden |
-| `startCapture`, `capUpdate`, `capPressDigit`, `capNext`, `capSave`, `capPressBack` | Fest auf 3 Felder ausgelegt, sie bekommen eine Feldliste je Wert |
-| `renderTable`, `renderChart` | Umschalter und neue Leerzustände |
-| `renderDetail`, `#detEdit`, `#detDelete` | Suchen nur in `entries` |
-| `exportCSV`, `exportJSON`, `shareBackup` | „Noch keine Werte" darf nur erscheinen, wenn beide Listen leer sind |
-| `clearAllData` | Anzahl und Löschen beider Listen |
-| Backup-Erinnerung, Zähler `#csvNote` | Prüfen bzw. zählen nur `entries` |
+| `openDB`, `initStorage` | Neuer Store `vitals` (`DB_VER` 2) und Laden von `vitals` |
+| `renderDashboard` | Neu aufgebaut, bricht nur ab, wenn **gar keine** Werte da sind (`totalCount`) |
+| `meanKey`, `trendChip` | Temperatur über `meanMetric`/`fmtMetric` mit Nachkommastelle; `trendChip` entfiel mit dem Trend |
+| `animateDashboard` | Hochzählen nur für ganze Zahlen, die Temperatur bleibt ohne Animation |
+| `startCapture`, `capUpdate`, `capPressDigit`, `capNext`, `capSave`, `capPressBack` | Feldliste je Art über `CAP_MODES` |
+| `renderTable`, `renderChart` | Umschalter (`viewMetric`), `getFilteredVitals`, `renderMetricChart`, neue Leerzustände |
+| `renderDetail`, `#detEdit`, `#detDelete` | Suchen über `findRecord` in beiden Listen, `renderVitalDetail` |
+| `exportCSV`, `exportJSON`, `shareBackup` | „Noch keine Werte" nur, wenn beide Listen leer sind (`totalCount`) |
+| `clearAllData` | Zählt und löscht beide Listen |
+| Backup-Erinnerung, Zähler `#csvNote` | Zählen alle Werte (`countParts`) |
 | `applyBackupSettings` | Grenzen zusammenführen statt ersetzen (siehe 6.2) |
 
 ---
@@ -296,11 +330,13 @@ Fahrenheit · gemeinsames Diagramm aller Werte.
 
 ## 12. Trennung Logik ↔ Design (Zusammenfassung)
 
-| Fix (im Code) | Offen (mit Claude Design) |
+| Fix (im Code) | Mit Claude Design entschieden (Zeichenfläche, umgesetzt) |
 |---|---|
-| Datenmodell, Speicher, Backup | Aussehen des großen + (A, B, C wählbar, Standard C) |
-| Eingabe-Regeln, Ziffern-Logik, Plausibilität, Sperre | Aussehen von Eingabe und Vorschau |
-| Berechnung, Zeitfenster, Rundung | Anordnung und Größe der neuen Dashboard-Bereiche |
-| Ampel-Regeln und Grenzen | Farben und Schrift im Rahmen der Tokens ([arzt-report-spezifikation.md](arzt-report-spezifikation.md), Abschnitt 8) |
-| Leerzustände (Regeln) | Genaue Text-Formulierungen |
-| Diagramm: Zeitachse, Punkte, Ø-Linie, Höhen-Achse | Diagramm-Feinschliff, Aussehen des Umschalters, App-Icon |
+| Datenmodell, Speicher, Backup | Großes +: **A, B und C wählbar, Standard C** (Abschnitt 9), Wahl im Menü → Anzeige |
+| Eingabe-Regeln, Ziffern-Logik, Plausibilität, Sperre | Eingabe mit großer Vorschauzahl, Segment-Kacheln und eigenem Ziffernblock |
+| Berechnung, Zeitfenster, Rundung | Dashboard „Letzte Messung + 7 Tage" im Kachel-Stil, ohne Trend, Ring und Punktreihe |
+| Ampel-Regeln und Grenzen | Zielbereich als Ampel-Leisten in einem eigenen Menü-Abschnitt; Farben und Schrift im Rahmen der Tokens ([arzt-report-spezifikation.md](arzt-report-spezifikation.md), Abschnitt 8) |
+| Leerzustände (Regeln) | Text-Formulierungen in App, Menü und Anleitung (vom Nutzer abgestimmt) |
+| Diagramm: Zeitachse, Punkte, Ø-Linie, Höhen-Achse | Umschalter Blutdruck · Temperatur · Sauerstoff, Sauerstoff-Symbol „Bläschen", App-Icon **7a** |
+
+Offen ist nur noch, wie einiges auf echten Geräten wirkt (iPhone und Android, siehe Gerätetests in der `CLAUDE.md`).
