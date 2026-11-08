@@ -501,10 +501,6 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
   animation:sheetSlide .34s cubic-bezier(.22,.61,.36,1);
   overflow:hidden;
 }
-.cap,.cap *{touch-action:pan-y pinch-zoom}               /* Waagerechtes Wischen gehört der App, Scrollen und Zwei-Finger-Zoom bleiben frei */
-/* Gleitet beim Wischen; die Kopie der alten Seite liegt während des Wechsels an derselben Stelle (app.js, capSlideTo) */
-.cap-stage{flex:1;min-height:0;display:flex;flex-direction:column}
-.cap-stage-old{position:absolute;left:0;right:0;pointer-events:none}
 .cap-grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 2px;flex:none}
 .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 20px 4px}
 .cap-title{font-size:20px;font-weight:800;letter-spacing:-.02em}
@@ -587,7 +583,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .cap-switch-ink{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 16px)/3);border-radius:999px;background:var(--accent);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
 .cap-switch button{position:relative;flex:1;min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:color .2s ease}
 .cap-switch button.active{color:var(--accent-ink)}
-@media (prefers-reduced-motion:reduce){.cap-switch-ink{transition:none}}
+@media (prefers-reduced-motion:reduce){.cap-switch-ink,.metric-seg-ink{transition:none}}
 /* Ampel des aktuellen Felds unter der Zahl; über 100 % rot */
 .cap-cur{min-height:28px;display:flex;align-items:center;justify-content:center}
 .cap-pill.lg{font-size:13px;padding:5px 12px;gap:6px;font-weight:700}
@@ -709,21 +705,24 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .vh-c-chev{width:20px}
 
 /* ---- Umschalter Blutdruck · Temperatur · Sauerstoff (Verlauf + Diagramm) ---- */
-.metric-seg{flex:none;display:flex;gap:4px;margin:2px 16px 6px;padding:3px;border-radius:999px;background:var(--surf2);border:1px solid var(--line)}
-.metric-seg button{flex:1;min-height:40px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:background-color .2s ease,color .2s ease}
-.metric-seg button.active{background:var(--surf);color:var(--accent);box-shadow:0 1px 3px rgba(20,30,50,.14)}
-/* Beim Wischen schiebt sich der Inhalt aus der Wischrichtung herein (Klasse setzt swipeSlide). */
-.swipe-next{animation:swipeNext .22s ease-out}
-.swipe-prev{animation:swipePrev .22s ease-out}
-.swipe-next .vrow,.swipe-prev .vrow{animation:none}
-@keyframes swipeNext{from{opacity:.2;transform:translateX(40px)}}
-@keyframes swipePrev{from{opacity:.2;transform:translateX(-40px)}}
+.metric-seg{position:relative;flex:none;display:flex;gap:4px;margin:2px 16px 6px;padding:3px;border-radius:999px;background:var(--surf2);border:1px solid var(--line)}
+.metric-seg-ink{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 14px)/3);border-radius:999px;background:var(--surf);box-shadow:0 1px 3px rgba(20,30,50,.14);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.metric-seg button{position:relative;flex:1;min-height:40px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:color .2s ease}
+.metric-seg button.active{color:var(--accent)}
+/* Wischen (Erfassen Variante B, Verlauf, Diagramm; app.js, swipePager): .swipe-stage gleitet, die Kopie der alten Seite
+   liegt währenddessen an derselben Stelle und spielt ihre Einblend-Animationen nicht erneut ab. */
+.cap,.cap *,#tab-table,#tab-table *,#tab-chart,#tab-chart *{touch-action:pan-y pinch-zoom}   /* Waagerecht wischen gehört der App, Scrollen und Zwei-Finger-Zoom bleiben frei */
+#tab-table,#tab-chart{overflow:hidden}
+.swipe-stage{flex:1;min-height:0;display:flex;flex-direction:column}
+.swipe-stage-old{position:absolute;left:0;right:0;pointer-events:none}
+.swipe-stage-old *{animation:none!important}
+.swipe-stage-old .dg-line{stroke-dashoffset:0}
 .vh-c-m{text-align:right}
 .vrow-m{text-align:right;font-size:15px;font-weight:800;white-space:nowrap}
 
 /* ---- Verlauf: scrollbare Liste ---- */
 .vh-scroll{flex:1;min-height:0;position:relative}
-#vList{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.vh-list{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .vh-fade{position:absolute;left:0;right:0;bottom:0;height:22px;background:linear-gradient(transparent,var(--bg));pointer-events:none}
 .vh-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 34px;color:var(--muted);font-size:14px;line-height:1.55}
 .vh-empty[hidden]{display:none}
@@ -903,7 +902,6 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 @media (prefers-reduced-motion:reduce){
   #tab-table.screen.active,#tab-detail.screen.active,#tab-chart.screen.active{animation:none}
   .vrow{animation:none!important}
-  .swipe-next,.swipe-prev{animation:none}
   .det-scale-mk,.sheet-panel,.sheet-scrim,.dg-chart,.dg-pop{animation:none}
   .det-nav:active,.det-primary:active,.det-del:active{transform:none}
   .dg-line,.dg-pt{animation:none;stroke-dashoffset:0}

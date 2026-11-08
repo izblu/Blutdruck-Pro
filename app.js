@@ -269,16 +269,15 @@ const CAT_LABEL={g:'Im Ziel', y:'Erhöht', r:'Zu hoch', n:'–'};
    Für Verlauf, Diagramm und Erfassen (Variante B). Nach links wischen = der Wert rechts daneben, am Ende kein Umlauf.
    Passive Touch-Ereignisse, damit senkrechtes Scrollen ungestört bleibt. Am Bildschirmrand gehört die Geste dem
    System (Zurück wischen). current() liefert den aktiven Wert oder null, wenn gerade nicht gewischt werden darf.
-   drag (nur Erfassen): {move(dx,kannWeiter), back()} lässt den Inhalt dem Finger folgen; dann zählt nur die Strecke,
-   nicht die Dauer, und ein zu kurzes Wischen endet mit back(). */
+   pager (swipePager): folgt dem Finger, solange gewischt wird. Beim Loslassen zählt nur die Strecke, nicht die Dauer. */
 const METRIC_ORDER=['bp','temp','spo2'];
-function onMetricSwipe(el,current,apply,drag){
+function onMetricSwipe(el,current,pager){
   let s=null;
   el.addEventListener('touchstart',ev=>{
     const t=ev.touches[0];
-    s=ev.touches.length===1&&t.clientX>=24&&t.clientX<=innerWidth-24 ? {x:t.clientX,y:t.clientY,at:ev.timeStamp,on:false} : null;
+    s=ev.touches.length===1&&t.clientX>=24&&t.clientX<=innerWidth-24 ? {x:t.clientX,y:t.clientY,on:false} : null;
   },{passive:true});
-  if(drag) el.addEventListener('touchmove',ev=>{
+  el.addEventListener('touchmove',ev=>{
     if(!s) return;
     const t=ev.touches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
     if(!s.on){
@@ -287,22 +286,57 @@ function onMetricSwipe(el,current,apply,drag){
       if(s.i<0||Math.abs(dx)<1.6*Math.abs(dy)){ s=null; return; }   // senkrecht begonnen: keine Wischgeste
       s.on=true;
     }
-    drag.move(dx,!!METRIC_ORDER[s.i+(dx<0?1:-1)]);
+    pager.move(dx,!!METRIC_ORDER[s.i+(dx<0?1:-1)]);
   },{passive:true});
-  el.addEventListener('touchcancel',()=>{ if(s&&s.on) drag.back(); s=null; },{passive:true});
+  el.addEventListener('touchcancel',()=>{ if(s&&s.on) pager.back(); s=null; },{passive:true});
   el.addEventListener('touchend',ev=>{
-    if(!s) return;
-    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, ms=ev.timeStamp-s.at, on=s.on; s=null;
-    const i=METRIC_ORDER.indexOf(current()), dir=dx<0?1:-1, next=i<0?null:METRIC_ORDER[i+dir];
-    if(next&&(on||ms<=700)&&Math.abs(dx)>=56&&Math.abs(dx)>=1.6*Math.abs(dy)) apply(next,dir);
-    else if(on) drag.back();
+    if(!s||!s.on){ s=null; return; }
+    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, next=METRIC_ORDER[s.i+(dx<0?1:-1)]; s=null;
+    if(next&&Math.abs(dx)>=56&&Math.abs(dx)>=1.6*Math.abs(dy)) pager.slideTo(next); else pager.back();
   },{passive:true});
 }
-/* Kurzes Einschieben aus der Wischrichtung (Klasse räumt sich selbst weg, damit sie spätere Aufbauten nicht beeinflusst). */
-function swipeSlide(el,dir){
-  el.classList.remove('swipe-next','swipe-prev'); void el.offsetWidth;
-  el.onanimationend=ev=>{ if(ev.target===el) el.classList.remove('swipe-next','swipe-prev'); };
-  el.classList.add(dir>0?'swipe-next':'swipe-prev');
+/* Bewegung beim Wechsel: Der Inhalt folgt dem Finger, die Markierung im Umschalter läuft mit. Beim Loslassen gleitet die
+   alte Seite hinaus und die neue herein; zu kurz gewischt oder am Ende der Reihe federt er zurück. Bei „Bewegung
+   reduzieren" (prefers-reduced-motion) wechselt der Wert sofort.
+   stage = der bewegte Bereich · ink = Markierung · current()/show(m) = aktiver Wert bzw. umschalten ·
+   scroller = Selektor des scrollenden Teils in stage (bleibt in der Kopie an seiner Stelle). */
+const SWIPE_SLIDE={duration:280,easing:'cubic-bezier(.22,.61,.36,1)'};
+const swipeFrame=x=>({transform:'translateX('+x+'px)',opacity:1-Math.min(1,Math.abs(x)/innerWidth)*.6});
+function swipeInkAt(ink,pos){ ink.style.transform='translateX(calc('+pos+' * (100% + 4px)))'; }
+function swipePager(stage,ink,current,show,scroller){
+  let dragX=0;
+  const index=()=>METRIC_ORDER.indexOf(current());
+  const clear=()=>{ dragX=0; stage.style.transform=stage.style.opacity=ink.style.transition=''; swipeInkAt(ink,index()); };
+  return {
+    move(dx,canGo){
+      if(prefersReduce()) return;
+      dragX=canGo?dx:dx*.25;                                    // am Ende der Reihe gibt der Inhalt nur gummiartig nach
+      Object.assign(stage.style,swipeFrame(dragX));
+      ink.style.transition='none';
+      swipeInkAt(ink,index()-(canGo?dx/innerWidth:0));
+    },
+    back(){
+      const x=dragX; clear();
+      if(x) stage.animate([swipeFrame(x),swipeFrame(0)],SWIPE_SLIDE);
+    },
+    slideTo(m){
+      const dir=Math.sign(METRIC_ORDER.indexOf(m)-index());
+      if(!dir) return;
+      if(prefersReduce()){ show(m); return; }
+      const x=dragX, w=stage.offsetWidth;
+      // Eine Kopie der alten Seite gleitet hinaus; der neue Wert steht sofort bereit, Tipps landen also schon richtig.
+      $$('.swipe-stage-old',stage.parentNode).forEach(n=>n.remove());   // sehr schnelles Wischen: nur die letzte Kopie bleibt
+      const old=stage.cloneNode(true);
+      [old,...old.querySelectorAll('[id]')].forEach(n=>n.removeAttribute('id'));
+      old.setAttribute('aria-hidden','true'); old.classList.add('swipe-stage-old');
+      old.style.top=stage.offsetTop+'px'; old.style.height=stage.offsetHeight+'px';
+      stage.before(old);
+      if(scroller) old.querySelector(scroller).scrollTop=stage.querySelector(scroller).scrollTop;
+      clear(); show(m);
+      old.animate([swipeFrame(x),swipeFrame(-dir*w)],SWIPE_SLIDE).onfinish=()=>old.remove();
+      stage.animate([swipeFrame(x+dir*w),swipeFrame(0)],SWIPE_SLIDE);
+    }
+  };
 }
 
 /* ---------- Erfassen (geführte Eingabe) ----------
@@ -370,46 +404,6 @@ function startCapture(opts,returnTab){
 /* Variante B: oben zwischen Blutdruck, Temperatur und Sauerstoff wechseln (Eingaben je Feld bleiben erhalten). */
 function capSetMode(m){ if(!CAP_MODES[m]||m===cap.mode) return; cap.mode=m; cap.fields=CAP_MODES[m]; cap.step=0; capUpdate(); }
 
-/* Variante B, Bewegung: Beim Wischen folgt der Inhalt dem Finger, die Markierung im Umschalter läuft mit. Beim Loslassen
-   gleitet die alte Seite hinaus und die neue herein; zu kurz gewischt oder am Ende der Reihe federt er zurück.
-   Bei „Bewegung reduzieren" (prefers-reduced-motion) wechselt der Wert sofort. */
-const capStage=$('#capStage'), capSwInk=$('#capSwitchInk'), capCalm=window.matchMedia('(prefers-reduced-motion: reduce)');
-const CAP_SLIDE={duration:280,easing:'cubic-bezier(.22,.61,.36,1)'};
-const capStageFrame=x=>({transform:'translateX('+x+'px)',opacity:1-Math.min(1,Math.abs(x)/innerWidth)*.6});
-let capDragX=0;
-function capSwInkAt(pos){ capSwInk.style.transform='translateX(calc('+pos+' * (100% + 4px)))'; }
-function capDragClear(){
-  capDragX=0; capStage.style.transform=capStage.style.opacity=capSwInk.style.transition='';
-  capSwInkAt(METRIC_ORDER.indexOf(cap.mode));
-}
-function capDragMove(dx,canGo){
-  if(capCalm.matches) return;
-  capDragX=canGo?dx:dx*.25;                                     // am Ende der Reihe gibt der Inhalt nur gummiartig nach
-  Object.assign(capStage.style,capStageFrame(capDragX));
-  capSwInk.style.transition='none';
-  capSwInkAt(METRIC_ORDER.indexOf(cap.mode)-(canGo?dx/innerWidth:0));
-}
-function capDragBack(){
-  const x=capDragX; capDragClear();
-  if(x) capStage.animate([capStageFrame(x),capStageFrame(0)],CAP_SLIDE);
-}
-function capSlideTo(m){
-  const dir=Math.sign(METRIC_ORDER.indexOf(m)-METRIC_ORDER.indexOf(cap.mode));
-  if(!dir) return;
-  if(capCalm.matches){ capSetMode(m); return; }
-  const x=capDragX, w=capStage.offsetWidth;
-  // Eine Kopie der alten Seite gleitet hinaus; der neue Wert steht sofort bereit, Tipps landen also schon richtig.
-  $$('.cap-stage-old').forEach(n=>n.remove());                  // sehr schnelles Wischen: nur die letzte Kopie bleibt
-  const old=capStage.cloneNode(true);
-  [old,...old.querySelectorAll('[id]')].forEach(n=>n.removeAttribute('id'));
-  old.setAttribute('aria-hidden','true'); old.classList.add('cap-stage-old');
-  old.style.top=capStage.offsetTop+'px'; old.style.height=capStage.offsetHeight+'px';
-  capStage.before(old);
-  capDragClear(); capSetMode(m);
-  old.animate([capStageFrame(x),capStageFrame(-dir*w)],CAP_SLIDE).onfinish=()=>old.remove();
-  capStage.animate([capStageFrame(x+dir*w),capStageFrame(0)],CAP_SLIDE);
-}
-
 /* Darf der Puls fehlen? Im Durchgang C und beim Bearbeiten einer Messung, die keinen Puls hatte. */
 const capPulseOptional=()=>cap.mode==='alle'||cap.pulseOptional;
 /* Was beim Speichern entstünde: {recs:[…], err:'', ok}. Systolisch und Diastolisch gehören zusammen. */
@@ -460,7 +454,7 @@ function capUpdate(){
   $('#capUnit').textContent=def.name.toUpperCase()+' · '+def.unit;
   const sw=$('#capSwitch'); sw.hidden=!cap.switcher;
   $$('#capSwitch button').forEach(b=>{ const on=b.dataset.m===cap.mode; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
-  if(cap.switcher) capSwInkAt(METRIC_ORDER.indexOf(cap.mode));
+  if(cap.switcher) swipeInkAt($('#capSwitchInk'),METRIC_ORDER.indexOf(cap.mode));
   $('#capProgress').hidden=!multi; $('#capSeg').hidden=!multi;
   if(multi){
     $$('#capProgress span').forEach(s=>{ const k=+s.dataset.i;
@@ -626,10 +620,11 @@ $('#capNoteBtn').addEventListener('click',capOpenNote);
 $('#capProgress').addEventListener('click',ev=>{ const s=ev.target.closest('span[data-i]'); if(s) capGoStep(+s.dataset.i); });
 $('#capTiles').addEventListener('click',ev=>{ const t=ev.target.closest('.cap-tile'); if(t) capGoStep(+t.dataset.i); });
 $('#capSkip').addEventListener('click',capSkip);
-$('#capSwitch').addEventListener('click',ev=>{ const b=ev.target.closest('[data-m]'); if(b) capSlideTo(b.dataset.m); });
+const capPager=swipePager($('#capStage'),$('#capSwitchInk'),()=>cap.mode,capSetMode);
+$('#capSwitch').addEventListener('click',ev=>{ const b=ev.target.closest('[data-m]'); if(b) capPager.slideTo(b.dataset.m); });
 onMetricSwipe($('#tab-capture'),
   ()=>cap.switcher&&!cap.saving&&$('#capDtSheet').hidden&&$('#capNoteSheet').hidden?cap.mode:null,
-  capSlideTo,{move:capDragMove,back:capDragBack});
+  capPager);
 $('#capDtPanel').addEventListener('click',ev=>{ const b=ev.target.closest('[data-act]'); if(!b||b.disabled) return;
   const a=b.dataset.act;
   if(a==='close') capCloseDt();
@@ -682,8 +677,10 @@ function getFilteredVitals(type){
 /* Umschalter-Zustand in Verlauf und Diagramm angleichen. */
 function syncMetricSeg(){
   $$('.metric-seg button').forEach(b=>{ const on=b.dataset.metric===viewMetric; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  $$('.metric-seg-ink').forEach(ink=>swipeInkAt(ink,METRIC_ORDER.indexOf(viewMetric)));
 }
 const vDate=d=>WD_SHORT[d.getDay()]+', '+pad2(d.getDate())+'.'+pad2(d.getMonth()+1)+'.';
+let vRowIntro=true;                                     // false beim Seitenwechsel: dann gleitet die ganze Liste, die Zeilen blenden nicht einzeln ein
 function renderTable(){
   applyVerlaufRange(); syncMetricSeg();
   const bp=viewMetric==='bp';
@@ -706,7 +703,7 @@ function renderTable(){
     let html='';
     list.forEach((e,i)=>{
       const d=new Date(e.ts), time=pad2(d.getHours())+':'+pad2(d.getMinutes()), delay=Math.min(i*0.04,0.32);
-      html+='<button class="vrow" type="button" data-id="'+e.id+'" style="animation-delay:'+delay+'s">';
+      html+='<button class="vrow" type="button" data-id="'+e.id+'" style="'+(vRowIntro?'animation-delay:'+delay+'s':'animation:none')+'">';
       if(bp){
         const sc=catValFor('sys',e.sys), dc=catValFor('dia',e.dia), oc=worseCat(sc,dc);
         html+='<span class="vrow-dot" style="background:'+CAT_BAR[oc]+'"></span>'
@@ -732,11 +729,19 @@ function setViewMetric(m){
   viewMetric=m;
   if(currentTab==='chart'){ closeDgPop(); renderChart(); } else renderTable();
 }
-document.addEventListener('click',ev=>{
-  const b=ev.target.closest('.metric-seg button[data-metric]'); if(b) setViewMetric(b.dataset.metric);
+/* Wischen und Antippen gleiten gleich; die neue Seite beginnt oben. */
+const metricPagers={};
+[['table','#vStage','.vh-list'],['chart','#dgStage','.dg-body']].forEach(([tab,stage,scroller])=>{
+  const screen=$('#tab-'+tab), box=$(stage+' '+scroller);
+  metricPagers[tab]=swipePager($(stage),$('.metric-seg-ink',screen),()=>viewMetric,m=>{
+    vRowIntro=false; setViewMetric(m); vRowIntro=true; box.scrollTop=0;
+  },scroller);
+  onMetricSwipe(screen,()=>viewMetric,metricPagers[tab]);
 });
-[['#tab-table','.vh-scroll'],['#tab-chart','#dgBody']].forEach(([screen,body])=>
-  onMetricSwipe($(screen),()=>viewMetric,(m,dir)=>{ setViewMetric(m); swipeSlide($(body),dir); }));
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('.metric-seg button[data-metric]');
+  if(b&&metricPagers[currentTab]) metricPagers[currentTab].slideTo(b.dataset.metric);
+});
 /* Gleitende Markierung unter die aktive Zeitraum-Pille legen (misst deren Position). */
 function positionVInk(){
   const bar=$('#vFilter'); if(!bar) return;

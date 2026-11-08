@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~660 Z.), `styles.css` (~955 Z.), `vitals.js` (~215 Z.), `app.js` (~2535 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v9`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v10`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 - `iphone-test/`: vorübergehende Testseite für die drei offenen iPhone-Fragen; wird nach den Gerätetests gelöscht
@@ -131,11 +131,14 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   ausgefüllten Feldern, `capSkip`) bzw. auf dem letzten Feld „Speichern" (`#capDone`). Den Knopf „Weiter" gibt es nicht
   mehr. Fehlt am Ende etwas Früheres, sagt der Hinweis über dem Ziffernblock, was. Unter 730 px Höhe rücken große Zahl
   und Tasten zusammen, damit die Zahl trotz Notiz-Feld nicht abgeschnitten wird.
-- **Wischen** (`onMetricSwipe`, `swipeSlide`): nach links = Wert rechts daneben, kein Umlauf, gilt in Verlauf, Diagramm
+- **Wischen** (`onMetricSwipe`, `swipePager`): nach links = Wert rechts daneben, kein Umlauf, gilt in Verlauf, Diagramm
   und Erfassen Variante B. Passive Touch-Ereignisse, also bleibt senkrechtes Scrollen frei; am Bildschirmrand (24 px)
-  gehört die Geste dem System. Beim Erfassen folgt der Inhalt (`#capStage`) dem Finger, die Markierung im Umschalter
-  (`#capSwitchInk`) läuft mit; beim Loslassen gleitet eine Kopie der alten Seite hinaus und die neue herein
-  (`capSlideTo`, auch beim Antippen des Umschalters), zu kurz oder am Ende der Reihe federt er zurück (`capDragBack`).
+  gehört die Geste dem System. In allen drei Screens folgt der Inhalt (`.swipe-stage`: `#capStage`, `#vStage`,
+  `#dgStage`) dem Finger, die Markierung im Umschalter (`#capSwitchInk`, `.metric-seg-ink`) läuft mit; beim Loslassen
+  gleitet eine Kopie der alten Seite hinaus und die neue herein (`slideTo`, auch beim Antippen des Umschalters), zu kurz
+  oder am Ende der Reihe federt er zurück (`back`). Die Kopie spielt keine Einblend-Animation ab (`.swipe-stage-old`),
+  die Verlauf-Zeilen blenden beim Seitenwechsel nicht einzeln ein (`vRowIntro`). Sonst gibt es nur noch das Wegwischen
+  von Meldungen (`swipeToast`, folgt ebenfalls dem Finger).
 
 ### Dashboard (`renderDashboard`, Startseite)
 „Letzte Messung + 7 Tage", alle vier Werte im selben Aufbau ([dashboard-spezifikation.md](dashboard-spezifikation.md)):

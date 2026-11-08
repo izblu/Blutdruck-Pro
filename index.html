@@ -66,7 +66,7 @@
       </div>
 
       <!-- Dieser Bereich gleitet beim Wischen (Variante B) -->
-      <div class="cap-stage" id="capStage">
+      <div class="swipe-stage" id="capStage">
         <div class="cap-mid">
           <!-- Fortschrittsbalken und Kacheln baut app.js je nach Feldliste (capBuildTiles) -->
           <div class="cap-progress" id="capProgress"></div>
@@ -157,15 +157,19 @@
     </div>
     <!-- Umschalter Blutdruck · Temperatur · Sauerstoff (gleicher Zustand wie im Diagramm) -->
     <div class="metric-seg" role="group" aria-label="Wert wählen">
+      <span class="metric-seg-ink"></span>
       <button type="button" data-metric="bp">Blutdruck</button>
       <button type="button" data-metric="temp">Temperatur</button>
       <button type="button" data-metric="spo2">Sauerstoff</button>
     </div>
-    <div class="vh-colh" id="vColh"></div>
-    <div class="vh-scroll">
-      <div id="vList"></div>
-      <div class="vh-empty" id="vEmpty" hidden></div>
-      <div class="vh-fade"></div>
+    <!-- Dieser Bereich gleitet beim Wischen -->
+    <div class="swipe-stage" id="vStage">
+      <div class="vh-colh" id="vColh"></div>
+      <div class="vh-scroll">
+        <div class="vh-list" id="vList"></div>
+        <div class="vh-empty" id="vEmpty" hidden></div>
+        <div class="vh-fade"></div>
+      </div>
     </div>
     <div class="vh-filter" id="vFilter">
       <span class="vh-ink" id="vInk"></span>
@@ -201,12 +205,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></button>
     </div>
     <div class="metric-seg" role="group" aria-label="Wert wählen">
+      <span class="metric-seg-ink"></span>
       <button type="button" data-metric="bp">Blutdruck</button>
       <button type="button" data-metric="temp">Temperatur</button>
       <button type="button" data-metric="spo2">Sauerstoff</button>
     </div>
-    <!-- Karte (Wert/Status + SVG-Grafik + Legende) · Statistik · Kontext füllt renderChart() -->
-    <div class="dg-body" id="dgBody"></div>
+    <!-- Karte (Wert/Status + SVG-Grafik + Legende) · Statistik · Kontext füllt renderChart(). Gleitet beim Wischen. -->
+    <div class="swipe-stage" id="dgStage"><div class="dg-body" id="dgBody"></div></div>
     <!-- Steuerleiste unten (über der Tab-Bar): Reihe · Puls · Zeitraum -->
     <div class="dg-controls">
       <span class="dg-range-lbl" id="dgRangeLbl"></span>
