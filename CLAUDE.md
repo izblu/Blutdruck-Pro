@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~660 Z.), `styles.css` (~955 Z.), `vitals.js` (~215 Z.), `app.js` (~2535 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v10`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v11`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 - `iphone-test/`: vorübergehende Testseite für die drei offenen iPhone-Fragen; wird nach den Gerätetests gelöscht
@@ -262,7 +262,7 @@ Einstiege: Icon im Diagramm-Kopf (`#rpOpenChart`) und Menü → Daten (`#mReport
   `localStorage['bpp_import_offered']`).
 
 ### App-Icon und iPhone-Feinschliff
-- **App-Icon 7a** (Nachtblau, schmale weiße PRO-Pille): `icon-192/512.png` (abgerundet, `purpose any`),
+- **App-Icon 7a** (Marine-Blau `#173366`, schmale weiße PRO-Pille): `icon-192/512.png` (abgerundet, `purpose any`),
   `icon-maskable-192/512.png` (vollflächig), `apple-touch-icon.png` (180×180), Header-Logo als `SVG_ICON` in app.js.
 - **Meta-Tags** in `index.html`: `apple-mobile-web-app-capable` (+ `mobile-web-app-capable`),
   `apple-mobile-web-app-title` „Blutdruck Pro", `apple-mobile-web-app-status-bar-style` `default` (die App hat eigene
