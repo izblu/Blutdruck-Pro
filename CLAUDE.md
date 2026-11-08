@@ -74,8 +74,6 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 - `sw.js`: Cache **`blutdruck-pro-v12`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
-- `iphone-test/`: vorübergehende Testseite für die drei offenen iPhone-Fragen; wird nach den Gerätetests gelöscht
-  (nur nach Rückfrage).
 
 ### Temperatur & Sauerstoff (`vitals.js`, Details in der Vitalwerte-Spezifikation)
 - **Eigene Liste `vitals`**, getrennt von den Blutdruck-Einträgen `entries` (so bleibt ein Pro-Backup für die alte
@@ -307,8 +305,10 @@ Anleitung, Icon, Installations-Assistent, Arzt-Report-Seiten und iPhone-Feinschl
 - **iPhone** nach der Geräte-Checkliste aus der Abschluss-Sitzung (2026-11-08): Assistent bis zur
   Installation, Start im Flugmodus, Statusleiste/Ränder/Icon hell und dunkel, Backup teilen → wiederherstellen,
   Arzt-Report drucken bzw. „Als Datei teilen" → PDF, Umzug von der alten App, beide Apps parallel.
-- Dabei die drei offenen Fragen klären (Teilen-Menü, Safari-Daten in der App, `window.print` in der App) und
-  danach anpassen. Danach `iphone-test/` löschen (nur nach Rückfrage).
+- Die Testseite `iphone-test/` wurde am 2026-11-08 auf Wunsch des Nutzers gelöscht (im Git-Verlauf noch vorhanden).
+  Die offenen Fragen deshalb an der echten App klären und danach anpassen: Kommt ein in Safari eingetragener Wert in
+  der installierten App an? Öffnet „Drucken" im Arzt-Report in der installierten App das Drucken-Fenster? Ob
+  `navigator.share` „Zum Home-Bildschirm" anbietet, bleibt offen (der Assistent nutzt es bewusst nicht).
 
 ### 2. Offen geblieben aus der UI/UX-Modernisierung
 - **Detail-Filter + Sortierung wieder einbauen** — mittel · mit Hürde. Verlauf und Diagramm haben nur den
