@@ -1799,7 +1799,7 @@ const RP={
   acc:{Kobalt:'#1E5FE0',Indigo:'#3B3F9E',Petrol:'#0E7C93',Violett:'#7048C4',Graphit:'#3C4A5E'}
 };
 const RP_ACC_ORDER=['Kobalt','Indigo','Petrol','Violett','Graphit'];
-let reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false};
+let reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true};
 const rpAcc=()=>RP.acc[reportState.accent]||RP.acc.Kobalt;
 
 const rpIso=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
@@ -1993,20 +1993,200 @@ function rpPage(rep){
   return `<div class="rp-page" style="width:794px;min-height:1123px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:38px 40px 34px"><div style="display:flex;flex-direction:column;gap:13px;flex:1">${header}${gesamt}${tageszeit}${distRow}${chartTile}${tableTile}</div>${rpFoot(rep)}</div>`;
 }
 /* ---- A4-Seite 2 (Anhang, Querformat): nur das Detail-Diagramm, füllend ---- */
-function rpLandscape(rep){
+function rpLandscape(rep,pageNo){
   const acc=rpAcc(), puls=reportState.puls;
   const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:12px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">Blutdruck-Bericht · Anhang</div><div style="font-size:12px;font-weight:600;color:${RP.muted};margin-top:3px">Detaillierter Verlauf & alle Messwerte</div></div></div><div style="text-align:right"><div style="font-size:12.5px;font-weight:800;color:${RP.ink}">${rep.period}</div><div style="font-size:11px;font-weight:600;color:${RP.muted};margin-top:2px">${rep.count} Messungen</div></div></div>`;
   const body=!rep.count
     ? `<div style="flex:1;background:${RP.surf2};border-radius:16px;display:flex;align-items:center;justify-content:center;color:${RP.muted};font-size:14px;font-weight:600">Für den gewählten Zeitraum liegen keine Messungen vor.</div>`
     : `<div style="flex:1;background:${RP.surf2};border-radius:16px;padding:15px 17px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};margin-bottom:10px">BLUTDRUCKVERLAUF · WERT & DATUM JE MESSPUNKT</div><div style="flex:1;display:flex;align-items:stretch">${rpChart(rep,1035,puls,acc,true)}</div>${rpLegend(puls)}</div>`;
-  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpFoot(rep,'Seite 2 · Anhang',{noTod:true})}</div>`;
+  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpFoot(rep,'Seite '+(pageNo||2)+' · Anhang',{noTod:true})}</div>`;
+}
+/* ---- A4-Seite „Temperatur & Sauerstoff" (Hochformat, nach Seite 1; Schalter im Report-Menü) ----
+   Gleiche Bausteine und feste helle Palette wie Seite 1. Je Wert: Ø in Ampelfarbe + Ampel-Wort
+   (catMetric auf dem gerundeten Ø), Tiefst–Höchst, Anzahl, Verlauf; darunter eine gemeinsame Werteliste.
+   Rein beschreibend, keine Bewertung. Spezifikation: arzt-report-spezifikation.md, Abschnitt 9. */
+function reportVitals(from,to){
+  const lo=new Date(from.getFullYear(),from.getMonth(),from.getDate()).getTime();
+  const hi=new Date(to.getFullYear(),to.getMonth(),to.getDate(),23,59,59,999).getTime();
+  const list=vitals.filter(v=>{ const t=new Date(v.ts).getTime(); return t>=lo&&t<=hi; });
+  const per=type=>{
+    const a=list.filter(v=>v.type===type).sort((x,y)=>new Date(x.ts)-new Date(y.ts));
+    const vals=a.map(v=>v.value), avg=a.length?meanMetric(a):null;
+    return {type,list:a,count:a.length,avg,cat:avg!=null?catMetric(type,avg):{c:'n',t:'—'},
+      min:vals.length?Math.min(...vals):null,max:vals.length?Math.max(...vals):null};
+  };
+  // Werteliste: Temperatur und Sauerstoff mit GLEICHEM Zeitpunkt (Durchgang „Alles nacheinander") in einer Zeile.
+  const byTs=new Map();
+  list.forEach(v=>{ const r=byTs.get(v.ts)||{ts:v.ts,notes:[]}; r[v.type]=v.value; if(v.note&&!r.notes.includes(v.note)) r.notes.push(v.note); byTs.set(v.ts,r); });
+  const rows=[...byTs.values()].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  return {count:list.length,temp:per('temp'),spo2:per('spo2'),rows};
+}
+const rpVAmp=(type,v)=>RP.amp[catMetric(type,v).c]||RP.amp.n;
+function rpMetricChart(m,W,acc){
+  const list=m.list, n=list.length; if(!n) return '';
+  const dec=METRICS[m.type].dec, padL=34, padR=46, top=12, bot=132, axisY=bot, dateY=axisY+19, H=dateY+6;
+  const step=dec?0.5:2, padV=dec?0.3:1.5;
+  let lo=Math.floor((m.min-padV)/step)*step, hi=Math.ceil((m.max+padV)/step)*step;
+  if(m.type==='spo2') hi=Math.min(hi,100+step);
+  const span=(hi-lo)||1, y=v=>+(bot-(v-lo)/span*(bot-top)).toFixed(1);
+  const tvs=list.map(v=>new Date(v.ts).getTime()), tlo=Math.min(...tvs), tspan=(Math.max(...tvs)-tlo)||1;
+  const xs=tvs.map(t=>n===1?+((padL+W-padR)/2).toFixed(1):+(padL+(t-tlo)/tspan*(W-padL-padR)).toFixed(1));
+  let s='';
+  const gs=(hi-lo)/step>6?step*2:step;
+  for(let t=Math.ceil(lo/gs)*gs; t<=hi+1e-9; t+=gs){
+    s+=`<line x1="${padL}" y1="${y(t)}" x2="${W-padR}" y2="${y(t)}" stroke="${RP.ink}" stroke-opacity=".07" stroke-width="1"/>`;
+    s+=`<text x="2" y="${y(t)+3.4}" font-size="9" font-weight="700" fill="${RP.faint}">${fmtMetric(m.type,t)}</text>`;
+  }
+  s+=`<polyline points="${list.map((v,i)=>xs[i]+','+y(v.value)).join(' ')}" fill="none" stroke="#c7d0dd" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  s+=`<line x1="${padL}" y1="${y(m.avg)}" x2="${W-padR}" y2="${y(m.avg)}" stroke="${acc}" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>`;
+  s+=`<text x="${W-padR+4}" y="${y(m.avg)+3.4}" font-size="9.5" font-weight="800" fill="${acc}">Ø ${fmtMetric(m.type,m.avg)}</text>`;
+  list.forEach((v,i)=>{ s+=`<circle cx="${xs[i]}" cy="${y(v.value)}" r="4.4" fill="${rpVAmp(m.type,v.value).bar}" stroke="#fff" stroke-width="1.3"/>`; });
+  s+=`<line x1="${padL}" y1="${axisY+6}" x2="${W-padR}" y2="${axisY+6}" stroke="${RP.line}" stroke-width="1"/>`;
+  const minGap=56, idx=[]; let last=-999;
+  for(let i=0;i<n;i++){ if(xs[i]-last>=minGap){ idx.push(i); last=xs[i]; } }
+  if(idx[idx.length-1]!==n-1){ if(xs[n-1]-xs[idx[idx.length-1]]<minGap*0.55) idx.pop(); idx.push(n-1); }
+  idx.forEach(i=>{ const d=new Date(list[i].ts), anchor=n===1?'middle':(i===0?'start':(i===n-1?'end':'middle'));
+    s+=`<text x="${xs[i]}" y="${dateY}" font-size="9.5" font-weight="700" fill="${RP.muted}" text-anchor="${anchor}">${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${s}</svg>`;
+}
+function rpVitalPage(rep,vrep,pageLabel){
+  const acc=rpAcc();
+  const tile=(inner,extra='')=>`<div class="rp-blk" style="background:${RP.surf2};border-radius:16px;padding:13px 15px${extra}">${inner}</div>`;
+  const mini=t=>`<div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted}">${t}</div>`;
+  const field=(lab,val)=>`<div style="display:flex;flex-direction:column;gap:3px;min-width:0"><div style="font-size:9.5px;font-weight:800;letter-spacing:.09em;color:${RP.muted}">${lab}</div><div style="font-size:13px;font-weight:700;color:${RP.ink}">${val}</div></div>`;
+  const parts=[vrep.temp.count?vrep.temp.count+' Temperatur':'',vrep.spo2.count?vrep.spo2.count+' Sauerstoff':''].filter(Boolean).join(' · ');
+  const header=`<div><div style="display:flex;align-items:center;gap:11px;margin-bottom:13px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">Temperatur &amp; Sauerstoff</div><div style="font-size:11.5px;font-weight:600;color:${RP.muted};margin-top:2px">Ergänzung zum Blutdruck-Bericht</div></div><div style="font-size:11px;font-weight:700;color:${RP.muted};text-align:right">Erstellt<br><span style="color:${RP.ink};font-weight:800">${rep.created}</span></div></div>`
+    +tile(`<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px">${field('ZEITRAUM',rep.period)}${field('MESSUNGEN',parts||'keine')}</div>`)+`</div>`;
+  const chip=c=>{ const a=RP.amp[c.c]||RP.amp.n; return `<span style="display:inline-flex;align-items:center;gap:6px;background:${a.soft};color:${a.ink};border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:${a.bar}"></span>${c.t}</span>`; };
+  const metricTile=m=>{
+    const M=METRICS[m.type], name=(m.type==='temp'?'TEMPERATUR':'SAUERSTOFF (SpO₂)')+' · '+M.unit;
+    if(!m.count) return tile(`${mini(name)}<div style="margin-top:10px;font-size:13px;font-weight:600;color:${RP.muted}">Keine Werte im Zeitraum.</div>`);
+    const avgCol=(RP.amp[m.cat.c]||RP.amp.n).ink;
+    const left=`<div style="width:150px;flex:none;display:flex;flex-direction:column;gap:10px">`
+      +`<div><div style="display:flex;align-items:baseline;gap:4px"><span style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;color:${avgCol}">Ø ${fmtMetric(m.type,m.avg)}</span><span style="font-size:12px;font-weight:700;color:${RP.muted}">${M.unit}</span></div><div style="margin-top:8px">${chip(m.cat)}</div></div>`
+      +`<div style="border-top:1px solid ${RP.line};padding-top:8px;display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:700;color:${RP.ink}">`
+      +`<div style="display:flex;justify-content:space-between"><span style="color:${RP.muted}">Tiefst – Höchst</span></div><div style="font-size:13px;font-weight:800">${fmtMetric(m.type,m.min)} – ${fmtMetric(m.type,m.max)} ${M.unit}</div>`
+      +`<div style="color:${RP.muted};font-weight:600">${m.count} Messung${m.count===1?'':'en'}</div></div></div>`;
+    return tile(`<div style="margin-bottom:10px">${mini(name)}</div><div style="display:flex;gap:16px;align-items:center">${left}<div style="flex:1;min-width:0">${rpMetricChart(m,520,acc)}</div></div>`);
+  };
+  const dot=c=>`<span style="width:9px;height:9px;border-radius:50%;flex:none;background:${c}"></span>`;
+  const valCell=(type,v)=>v==null?`<div style="text-align:right;font-size:13px;font-weight:700;color:#c2cad6">—</div>`
+    :`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">${dot(rpVAmp(type,v).bar)}<span style="font-size:13.5px;font-weight:800;color:${rpVAmp(type,v).ink}">${fmtMetric(type,v)}</span></div>`;
+  const cols='1fr 46px 80px 80px 1.7fr', WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const hc=(t,r)=>`<div style="font-size:9.5px;font-weight:800;letter-spacing:.06em${r?';text-align:right':''}">${t}</div>`;
+  let rows=`<div style="display:grid;grid-template-columns:${cols};gap:10px;align-items:center;padding:0 12px 8px;color:${RP.muted}">${hc('DATUM')}${hc('ZEIT')}${hc('TEMP. °C',1)}${hc('SpO₂ %',1)}${hc('NOTIZ')}</div>`;
+  vrep.rows.forEach((r,i)=>{ const d=new Date(r.ts);
+    rows+=`<div class="rp-trow" style="display:grid;grid-template-columns:${cols};gap:10px;align-items:center;padding:8px 12px;border-top:1px solid ${RP.line}${i%2===1?';background:'+RP.surf2:''}">`
+      +`<div style="font-size:12px;font-weight:700;color:${RP.ink}">${WD[d.getDay()]} ${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.</div>`
+      +`<div style="font-size:11.5px;font-weight:600;color:${RP.muted}">${fmtTime(r.ts)}</div>`
+      +valCell('temp',r.temp)+valCell('spo2',r.spo2)
+      +`<div style="font-size:11px;font-weight:500;color:${RP.muted};line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes.length?escapeHtml(r.notes.join(' · ')):'—'}</div></div>`; });
+  const table=`<div class="rp-tabletile" style="background:${RP.surf};border:1px solid ${RP.line};border-radius:16px;overflow:hidden"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};padding:13px 15px 6px">ALLE WERTE · ${vrep.count}</div><div style="padding:0 4px 8px">${rows}</div></div>`;
+  return `<div class="rp-page" style="width:794px;min-height:1123px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:38px 40px 34px"><div style="display:flex;flex-direction:column;gap:13px;flex:1">${header}${metricTile(vrep.temp)}${metricTile(vrep.spo2)}${table}</div>${rpVFoot(pageLabel)}</div>`;
+}
+/* Fußzeile der Temperatur-&-Sauerstoff-Seiten: angewendete Grenzen (settings.thr) + Haftungshinweis. */
+function rpVFoot(pageLabel){
+  const t=settings.thr, f=v=>String(v).replace('.',',');
+  return `<div style="margin-top:auto;padding-top:18px;border-top:1px solid ${RP.line};font-size:10.5px;line-height:1.5;color:${RP.muted};display:flex;justify-content:space-between;gap:16px"><div style="max-width:760px;display:flex;flex-direction:column;gap:4px">`
+    +`<div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>Temperatur normal ab ${fmtMetric('temp',t.tempLow)} °C (darunter niedrig), erhöht ab ${fmtMetric('temp',t.tempY)} °C, Fieber ab ${fmtMetric('temp',t.tempR)} °C · Sauerstoff im Ziel ab ${f(t.spo2G)} %, niedrig ab ${f(t.spo2Y)} %, darunter zu niedrig.</div>`
+    +`<div>Rein beschreibende Auswertung der erfassten Werte — keine ärztliche Bewertung oder Diagnose.</div></div><div style="text-align:right;white-space:nowrap">Blutdruck Pro<br>${pageLabel}</div></div>`;
+}
+/* Anhang „Temperatur & Sauerstoff" (Querformat): beide Werte auf EINER Seite, je ein Band übereinander mit
+   gemeinsamer zeitgetreuer X-Achse, Wert je Messpunkt (wie Sys/Dia im Blutdruck-Anhang) und Datum. */
+function rpVitalChartDetail(vrep,W,acc){
+  const ms=[vrep.temp,vrep.spo2].filter(m=>m.count), all=[...vrep.temp.list,...vrep.spo2.list];
+  if(!all.length) return '';
+  const padL=40, padR=50, both=ms.length===2, axisY=532, dateY=axisY+19, H=dateY+6;
+  const bands=both?[[30,248],[318,512]]:[[30,512]];
+  const tvs=all.map(v=>new Date(v.ts).getTime()), tlo=Math.min(...tvs), thi=Math.max(...tvs), tspan=(thi-tlo)||1;
+  const xOf=ts=>thi===tlo?+((padL+W-padR)/2).toFixed(1):+(padL+(new Date(ts).getTime()-tlo)/tspan*(W-padL-padR)).toFixed(1);
+  let s='';
+  ms.forEach((m,bi)=>{
+    const [top,bot]=bands[bi], dec=METRICS[m.type].dec, step=dec?0.5:2, padV=dec?0.4:2;
+    let lo=Math.floor((m.min-padV)/step)*step, hi=Math.ceil((m.max+padV)/step)*step;
+    if(m.type==='spo2') hi=Math.min(hi,100+step);
+    const span=(hi-lo)||1, y=v=>+(bot-(v-lo)/span*(bot-top)).toFixed(1);
+    const name=m.type==='temp'?'TEMPERATUR · °C':'SAUERSTOFF (SpO₂) · %';
+    s+=`<text x="2" y="${top-14}" font-size="9.5" font-weight="800" fill="${RP.muted}" letter-spacing=".08em">${name}</text>`;
+    const gs=(hi-lo)/step>8?step*2:step;
+    for(let t=Math.ceil(lo/gs)*gs; t<=hi+1e-9; t+=gs){
+      s+=`<line x1="${padL}" y1="${y(t)}" x2="${W-padR}" y2="${y(t)}" stroke="${RP.ink}" stroke-opacity=".07" stroke-width="1"/>`;
+      s+=`<text x="2" y="${y(t)+3.4}" font-size="9" font-weight="700" fill="${RP.faint}">${fmtMetric(m.type,t)}</text>`;
+    }
+    s+=`<polyline points="${m.list.map(v=>xOf(v.ts)+','+y(v.value)).join(' ')}" fill="none" stroke="#c7d0dd" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s+=`<line x1="${padL}" y1="${y(m.avg)}" x2="${W-padR}" y2="${y(m.avg)}" stroke="${acc}" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>`;
+    s+=`<text x="${W-padR+4}" y="${y(m.avg)+3.4}" font-size="9.5" font-weight="800" fill="${acc}">Ø ${fmtMetric(m.type,m.avg)}</text>`;
+    m.list.forEach(v=>{ const a=rpVAmp(m.type,v.value), x=xOf(v.ts), yy=y(v.value);
+      s+=`<circle cx="${x}" cy="${yy}" r="4.6" fill="${a.bar}" stroke="#fff" stroke-width="1.3"/>`;
+      s+=`<text x="${x}" y="${yy-9}" font-size="9" font-weight="800" fill="${a.ink}" text-anchor="middle">${fmtMetric(m.type,v.value)}</text>`; });
+    if(both&&bi===0) s+=`<line x1="${padL}" y1="${bot+30}" x2="${W-padR}" y2="${bot+30}" stroke="${RP.line}" stroke-width="1"/>`;
+  });
+  // gemeinsame Zeitachse: Strich je Messzeitpunkt, Datum mit Mindestabstand
+  const xs=[...new Set(all.map(v=>v.ts))].sort((a,b)=>new Date(a)-new Date(b)).map(ts=>({ts,x:xOf(ts)}));
+  s+=`<line x1="${padL}" y1="${axisY+6}" x2="${W-padR}" y2="${axisY+6}" stroke="${RP.line}" stroke-width="1"/>`;
+  const n=xs.length, minGap=52, idx=[]; let last=-999;
+  for(let i=0;i<n;i++){ if(xs[i].x-last>=minGap){ idx.push(i); last=xs[i].x; } }
+  if(idx[idx.length-1]!==n-1){ if(xs[n-1].x-xs[idx[idx.length-1]].x<minGap*0.55) idx.pop(); idx.push(n-1); }
+  const isL={}; idx.forEach(i=>isL[i]=true);
+  xs.forEach((p,i)=>{ s+=`<line x1="${p.x}" y1="${axisY+6}" x2="${p.x}" y2="${axisY+(isL[i]?12:9)}" stroke="${isL[i]?RP.muted:RP.faint}" stroke-opacity="${isL[i]?.85:.5}" stroke-width="${isL[i]?1.4:1}"/>`; });
+  idx.forEach(i=>{ const d=new Date(xs[i].ts), anchor=n===1?'middle':(i===0?'start':(i===n-1?'end':'middle'));
+    s+=`<text x="${xs[i].x}" y="${dateY}" font-size="9.5" font-weight="700" fill="${RP.muted}" text-anchor="${anchor}">${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${s}</svg>`;
+}
+function rpVitalLandscape(rep,vrep,pageNo){
+  const acc=rpAcc();
+  const parts=[vrep.temp.count?vrep.temp.count+' Temperatur':'',vrep.spo2.count?vrep.spo2.count+' Sauerstoff':''].filter(Boolean).join(' · ');
+  const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:12px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">Temperatur &amp; Sauerstoff · Anhang</div><div style="font-size:12px;font-weight:600;color:${RP.muted};margin-top:3px">Detaillierter Verlauf & alle Messwerte</div></div></div><div style="text-align:right"><div style="font-size:12.5px;font-weight:800;color:${RP.ink}">${rep.period}</div><div style="font-size:11px;font-weight:600;color:${RP.muted};margin-top:2px">${parts}</div></div></div>`;
+  const item=(node,txt)=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:${RP.muted}">${node}${txt}</span>`;
+  const disc=c=>`<span style="width:10px;height:10px;border-radius:50%;background:${c}"></span>`;
+  const legend=`<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">${item(disc(RP.amp.g.bar),'im Zielbereich')}${item(disc(RP.amp.y.bar),'etwas außerhalb')}${item(disc(RP.amp.r.bar),'deutlich außerhalb')}${item(`<span style="width:16px;height:0;border-top:2px dashed ${RP.muted}"></span>`,'Ø Mittel')}</div>`;
+  const body=`<div style="flex:1;background:${RP.surf2};border-radius:16px;padding:15px 17px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};margin-bottom:10px">VERLAUF · WERT & DATUM JE MESSPUNKT</div><div style="flex:1;display:flex;align-items:stretch">${rpVitalChartDetail(vrep,1035,acc)}</div>${legend}</div>`;
+  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpVFoot('Seite '+pageNo+' · Anhang')}</div>`;
+}
+/* Alle Druckseiten in der richtigen Reihenfolge: Seite 1 · Temperatur & Sauerstoff (wenn an und Werte da) ·
+   Anhang Blutdruck · Anhang Temperatur & Sauerstoff (beide nur mit „Anhangseite drucken"). */
+function rpPages(rep,vrep){
+  const withV=reportState.vital&&vrep.count>0;
+  return {withV, p1:rpPage(rep), pv:withV?rpVitalPage(rep,vrep,'Seite 2'):'', pa:reportState.anhang?rpLandscape(rep,withV?3:2):'',
+    pa2:reportState.anhang&&withV?rpVitalLandscape(rep,vrep,4):''};
+}
+
+/* „Als Datei teilen": Ersatz fürs Drucken, falls window.print in der installierten App nicht klappt
+   (auf dem iPhone UNBESTÄTIGT). Baut eine eigenständige HTML-Datei mit denselben Seiten (Schrift
+   eingebettet) und teilt sie (Web Share API); sonst wird sie heruntergeladen. Die Schrift wird beim
+   Öffnen des Reports vorab geladen, damit navigator.share direkt im Klick läuft (Gesten-Schutz). */
+let _rpFontData='';
+function rpLoadFont(){
+  if(_rpFontData) return;
+  fetch('./fonts/hanken-grotesk.woff2').then(r=>r.ok?r.blob():null).then(b=>{ if(!b) return;
+    const fr=new FileReader(); fr.onload=()=>{ _rpFontData=String(fr.result||''); }; fr.readAsDataURL(b); }).catch(()=>{});
+}
+function rpStandaloneHTML(){
+  const font=_rpFontData?`@font-face{font-family:'Hanken Grotesk';src:url(${_rpFontData}) format('woff2');font-weight:100 900;font-display:swap}`:'';
+  return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=840">'
+    +'<title>Blutdruck-Bericht</title><style>'+font
+    +"body{margin:0;background:#eef1f6;font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;-webkit-print-color-adjust:exact;print-color-adjust:exact}"
+    +'*{box-sizing:border-box}.rp-page{margin:16px auto;box-shadow:0 2px 14px rgba(16,24,40,.12)}'
+    +'@page{size:A4 portrait;margin:0}@page rp-land{size:A4 landscape;margin:0}'
+    +'@media print{body{background:#fff}.rp-page{margin:0 auto;box-shadow:none}.rp-page-land{page:rp-land;break-before:page}'
+    +'.rp-page:not(.rp-page-land){display:block!important}.rp-page+.rp-page{break-before:page}.rp-tabletile{overflow:visible!important}.rp-blk,.rp-trow{break-inside:avoid}}'
+    +'</style></head><body>'+$('#reportPrint').innerHTML+'</body></html>';
+}
+async function rpShareFile(){
+  const name='blutdruck-pro-bericht-'+rpIso(new Date())+'.html';
+  const html=rpStandaloneHTML(), file=new File([html],name,{type:'text/html'});
+  const save=()=>{ download(new Blob([html],{type:'text/html'}),name); toast('Bericht als Datei gespeichert'); };
+  if(navigator.canShare&&(()=>{ try{ return navigator.canShare({files:[file]}); }catch{ return false; } })()){
+    try{ await navigator.share({files:[file],title:'Blutdruck-Bericht'}); toast('Bericht geteilt'); }
+    catch(e){ if(!(e&&e.name==='AbortError')) save(); }
+  } else save();
 }
 
 /* ---- Report-Screen: Menü (App-Theme) + Live-Vorschau + Druck-Container ---- */
 function renderReport(){
   const {from,to}=rpRangeDates();
   if(reportState.range==='custom'){ if(!reportState.from) reportState.from=rpIso(from); if(!reportState.to) reportState.to=rpIso(to); }
-  const rep=reportData(from,to);
+  const rep=reportData(from,to), vrep=reportVitals(from,to), pg=rpPages(rep,vrep);
   const card=inner=>`<div class="rp-card">${inner}</div>`;
   const lbl=t=>`<div class="rp-lbl">${t}</div>`;
   const pill=(k,t)=>`<button class="rp-pill${reportState.range===k?' active':''}" data-rp="range" data-val="${k}" type="button">${t}</button>`;
@@ -2017,24 +2197,30 @@ function renderReport(){
   const swatch=l=>{ const on=reportState.accent===l; return `<button class="rp-swatch${on?' active':''}" data-rp="acc" data-val="${l}" title="${l}" type="button" style="--sw:${RP.acc[l]}">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}</button>`; };
   const farbe=card(lbl('REPORT-FARBE')+`<div class="rp-swatches">${RP_ACC_ORDER.map(swatch).join('')}</div>`);
   const tog=(k,t,sub)=>`<div class="rp-opt"><div class="rp-opt-txt"><div class="rp-opt-t">${t}</div>${sub?`<div class="rp-opt-s">${sub}</div>`:''}</div><button class="rp-toggle${reportState[k]?' on':''}" data-rp="toggle" data-val="${k}" type="button" role="switch" aria-checked="${reportState[k]?'true':'false'}"><span class="rp-knob"></span></button></div>`;
-  const opt=card(lbl('OPTIONEN')+tog('namen','Namensfeld zum Ausfüllen')+tog('puls','Puls einbeziehen')+tog('anhang','Anhangseite drucken','Detail-Diagramm im Querformat (Seite 2)'));
-  const preview=`<div class="rp-card rp-preview">${lbl('VORSCHAU')}<div class="rp-shot" id="rpShot1"><div class="rp-scaler" id="rpScaler1">${rpPage(rep)}</div></div>${reportState.anhang?`<div class="rp-anh-lbl">ANHANG · Seite 2 · Querformat</div><div class="rp-shot" id="rpShot2"><div class="rp-scaler" id="rpScaler2">${rpLandscape(rep)}</div></div>`:''}</div>`;
+  const vSub=vrep.count?'Eigene Seite: '+[vrep.temp.count?vrep.temp.count+' Temperatur':'',vrep.spo2.count?vrep.spo2.count+' Sauerstoff':''].filter(Boolean).join(' · '):'Keine Werte im Zeitraum';
+  const opt=card(lbl('OPTIONEN')+tog('namen','Namensfeld zum Ausfüllen')+tog('puls','Puls einbeziehen')+tog('vital','Temperatur & Sauerstoff einbeziehen',vSub)+tog('anhang',pg.withV?'Anhangseiten drucken':'Anhangseite drucken',pg.withV?'Detail-Diagramme im Querformat (Seite 3 und 4)':'Detail-Diagramm im Querformat (Seite 2)'));
+  const shot=(w,html)=>`<div class="rp-shot" data-w="${w}"><div class="rp-scaler">${html}</div></div>`;
+  const preview=`<div class="rp-card rp-preview">${lbl('VORSCHAU')}${shot(794,pg.p1)}`
+    +(pg.withV?`<div class="rp-anh-lbl">SEITE 2 · TEMPERATUR &amp; SAUERSTOFF</div>${shot(794,pg.pv)}`:'')
+    +(reportState.anhang?`<div class="rp-anh-lbl">ANHANG · Seite ${pg.withV?3:2} · Querformat</div>${shot(1123,pg.pa)}`:'')
+    +(pg.pa2?`<div class="rp-anh-lbl">ANHANG · Seite 4 · Temperatur &amp; Sauerstoff</div>${shot(1123,pg.pa2)}`:'')+`</div>`;
   $('#rpBody').innerHTML=zeit+farbe+opt+preview;
-  $('#reportPrint').innerHTML=rpPage(rep)+(reportState.anhang?rpLandscape(rep):'');
+  $('#reportPrint').innerHTML=pg.p1+pg.pv+pg.pa+pg.pa2;
   rpScalePreview();
 }
 /* Vorschau: die naturgroßen A4-Seiten auf die Bildschirmbreite herunterskalieren. */
 function rpScalePreview(){
-  [['#rpShot1','#rpScaler1',794],['#rpShot2','#rpScaler2',1123]].forEach(cfg=>{
-    const shot=$(cfg[0]), sc=$(cfg[1]); if(!shot||!sc) return;
+  $$('#rpBody .rp-shot').forEach(shot=>{
+    const sc=shot.firstElementChild, base=+shot.dataset.w||794; if(!sc) return;
     const w=shot.clientWidth; if(!w) return;
-    const k=w/cfg[2]; sc.style.transform='scale('+k+')';
-    const page=sc.firstElementChild; shot.style.height=((page?page.offsetHeight:cfg[2])*k)+'px';
+    const k=w/base; sc.style.transform='scale('+k+')';
+    const page=sc.firstElementChild; shot.style.height=((page?page.offsetHeight:base)*k)+'px';
   });
 }
 /* Report öffnen: Zustand IMMER auf Standard zurücksetzen (flüchtig), dann als eigene Ebene öffnen. */
 function openReport(){
-  reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false};
+  reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true};
+  rpLoadFont();                       // Schrift für „Als Datei teilen" vorab laden
   navPush('report',null);
 }
 /* Bedienung: eine delegierte Klick-/Change-Behandlung am Screen (überlebt das Neu-Rendern des Körpers).
@@ -2047,6 +2233,7 @@ if(rpScreen){
     const a=t.dataset.rp;
     if(a==='back'){ navBack(); return; }
     if(a==='print'){ window.print(); return; }
+    if(a==='share'){ rpShareFile(); return; }
     if(a==='range'){ if(reportState.range!==t.dataset.val){ reportState.range=t.dataset.val; renderReport(); } return; }
     if(a==='acc'){ if(reportState.accent!==t.dataset.val){ reportState.accent=t.dataset.val; renderReport(); } return; }
     if(a==='toggle'){ const k=t.dataset.val; reportState[k]=!reportState[k]; renderReport(); }

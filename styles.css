@@ -927,6 +927,11 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .rp-sq:active{background:var(--line)}
 .rp-print{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;height:52px;background:var(--accent);color:var(--accent-ink);border:none;border-radius:14px;font-size:15.5px;font-weight:800;cursor:pointer;font-family:inherit}
 .rp-print svg{width:19px;height:19px}
+/* „Als Datei teilen": Ersatz fürs Drucken (zweiter, ruhigerer Knopf neben „Drucken") */
+.rp-share{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:52px;padding:0 8px;background:var(--surf2);color:var(--ink);border:1px solid var(--line);border-radius:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
+.rp-share svg{width:18px;height:18px;flex:none;color:var(--accent)}
+.rp-actions .rp-print{font-size:14.5px;padding:0 8px}
+@media (max-width:389px){.rp-actions .rp-share svg,.rp-actions .rp-print svg{display:none}}
 #reportPrint{display:none}
 
 /* ---- Druck: nur die A4-Seite(n) in Naturgröße; Seite 2 quer über benannte @page ---- */
@@ -944,6 +949,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
   #reportPrint .rp-page:not(.rp-page-land){display:block!important}
   #reportPrint .rp-tabletile{overflow:visible!important}
   #reportPrint .rp-blk,#reportPrint .rp-trow{break-inside:avoid}
+  #reportPrint .rp-page+.rp-page{break-before:page}   /* jede Seite (auch „Temperatur & Sauerstoff") auf ein neues Blatt */
 }
 @media (prefers-reduced-motion:reduce){
   #tab-report.screen.active{animation:none}

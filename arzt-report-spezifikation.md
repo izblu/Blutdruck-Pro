@@ -131,3 +131,51 @@ Damit der Entwurf zum App-Look passt. Der Report ist **immer hell** (Druck auf W
 - **Puls:** Balken `#e11d68`, Text `#be185d`.
 - **Schrift:** „Hanken Grotesk" (Gewichte 400–800). Zahlen tabellarisch (`tabular-nums`).
 - **Form:** Karten-Radius ~22 px, ruhige, klinisch-kühle Anmutung wie der Rest der App.
+
+---
+
+## 9. Seite „Temperatur & Sauerstoff" (Nachtrag 2026-11-08, Blutdruck Pro)
+
+Eigene A4-Seite (Hochformat) **nach Seite 1** und **vor** dem Querformat-Anhang. Kein eigener Entwurf, gebaut im Stil
+von Seite 1 (gleiche helle Palette `RP`, gleiche Kacheln, gleiche Fußzeile). Funktionen: `reportVitals`, `rpMetricChart`,
+`rpVitalPage`, `rpPages` in [app.js](app.js).
+
+- **Schalter** im Report-Menü: „Temperatur & Sauerstoff einbeziehen", Standard **an** (wie alle Report-Optionen flüchtig,
+  nicht in `settings`/Backup). Unterzeile zeigt die Anzahl je Wert im Zeitraum („Eigene Seite: 10 Temperatur · 9 Sauerstoff").
+- **Keine Werte im Zeitraum:** Die Seite entfällt, auch wenn der Schalter an ist; Unterzeile „Keine Werte im Zeitraum".
+  Fehlt nur einer der beiden Werte, zeigt seine Kachel „Keine Werte im Zeitraum."
+- **Zeitraum:** derselbe wie Seite 1 (eigener Von–Bis-Wähler des Reports).
+- **Je Wert eine Kachel:**
+  - **Ø** über alle Messungen im Zeitraum, gerundet wie in der App (`meanMetric`: Temperatur 0,1 °C, Sauerstoff ganzzahlig),
+    in Ampelfarbe **plus Ampel-Wort** (`catMetric` auf dem gerundeten Ø, z. B. „Normal", „Fieber", „Im Ziel").
+  - **Tiefst – Höchst** und **Anzahl** der Messungen.
+  - **Verlauf:** zeitgetreue X-Achse, Punkte in Ampelfarbe, graue Verbindungslinie, gestrichelte Ø-Linie mit Wert.
+    Keine Schwellen-Linien (wie Seite 1).
+- **Werteliste „ALLE WERTE"**, neueste zuerst, Spalten Datum · Zeit · Temp. °C · SpO₂ % · Notiz. Temperatur und Sauerstoff
+  mit **gleichem Zeitpunkt** (Durchgang „Alles nacheinander") stehen in **einer** Zeile, unterschiedliche Notizen werden mit
+  „ · " verbunden. Wert mit Ampel-Punkt in Ampelfarbe; fehlender Wert „—".
+- **Fußzeile:** angewendete Grenzwerte aus `settings.thr` (Temperatur normal ab `tempLow`, erhöht ab `tempY`, Fieber ab `tempR`;
+  Sauerstoff im Ziel ab `spo2G`, niedrig ab `spo2Y`, darunter zu niedrig) und derselbe Haftungshinweis wie Seite 1.
+  Die Standard-Fiebergrenzen sind gängige Richtwerte, **nicht gegen eine Leitlinie bestätigt** (siehe
+  `vitalwerte-spezifikation.md`).
+- **Anhang „Temperatur & Sauerstoff" (Querformat, Wunsch des Nutzers 2026-11-08):** mit „Anhangseiten drucken" kommt nach dem
+  Blutdruck-Anhang eine zweite Querformat-Seite (`rpVitalLandscape`, Grafik `rpVitalChartDetail`). Beide Werte auf **einer**
+  Seite wie Sys/Dia im Blutdruck-Anhang: Temperatur oben, Sauerstoff darunter (je eigenes Band, weil die Einheiten verschieden
+  sind), **gemeinsame** zeitgetreue Datumsachse, **Wert an jedem Messpunkt** in Ampelfarbe, Ø-Linie je Band. Legende: Punktfarbe
+  = Ampel (im Zielbereich / etwas außerhalb / deutlich außerhalb) und Ø Mittel. Fußzeile wie die Hochformat-Seite.
+- **Seitenzahlen:** Seite 1 · „Seite 2" (Temperatur & Sauerstoff) · Blutdruck-Anhang „Seite 3 · Anhang" · Temperatur-&-Sauerstoff-
+  Anhang „Seite 4 · Anhang". Ohne Temperatur/Sauerstoff im Zeitraum: Seite 1 und Blutdruck-Anhang „Seite 2 · Anhang".
+- **Druck:** jede weitere Seite beginnt auf einem neuen Blatt (`.rp-page+.rp-page{break-before:page}`).
+
+## 10. „Als Datei teilen" (Nachtrag 2026-11-08)
+
+Knopf neben „Drucken". **Ersatz**, weil **unbestätigt** ist, ob `window.print()` in der installierten App auf dem iPhone den
+Druckdialog öffnet.
+
+- Baut eine **eigenständige HTML-Datei** (`blutdruck-pro-bericht-JJJJ-MM-TT.html`) mit genau den Seiten, die gedruckt würden,
+  der eingebetteten Schrift (Hanken Grotesk als Daten-URL) und eigenen Druckregeln (A4 hoch, Anhang quer).
+- Teilt sie über die Web Share API (`navigator.share({files})`). Geht das nicht (z. B. am PC), wird sie **heruntergeladen**;
+  Abbrechen im Teilen-Menü tut nichts.
+- Die Schrift wird schon beim Öffnen des Reports geladen, damit das Teilen direkt im Tipp passiert (Browser verlangen das).
+- **Unbestätigt:** ob das iPhone die geteilte HTML-Datei über „Drucken" als PDF ausgeben kann (Weg: Teilen → In Dateien
+  sichern → Datei öffnen → Teilen → Drucken). Gehört in die Geräte-Prüfung.
