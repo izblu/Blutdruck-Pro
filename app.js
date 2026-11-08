@@ -117,7 +117,7 @@ function askConfirm(opts){
 /* ---------- Speicherung ---------- */
 const LS_KEY='bpp_entries', LS_SET='bpp_settings';
 const SET_DEFAULT={colorDots:true,guideLines:true,theme:'auto',accent:'kobalt',
-  reminderDays:3,firstDirtyAt:null,snoozeUntil:0,plusMode:'c',
+  reminderDays:3,firstDirtyAt:null,snoozeUntil:0,plusMode:'c',hiddenVitals:[],
   thr:{sysY:130,sysR:140,diaY:85,diaR:90,...VITAL_THR_DEFAULT}};   // Temperatur/Sauerstoff-Grenzen aus vitals.js
 
 /* IndexedDB ist der robuste Hauptspeicher (überlebt Speicherdruck/ITP deutlich besser
@@ -271,8 +271,9 @@ const metricInk=(type,c)=>hasAmpel(type)?CAT_INK[c]:'var(--ink)';
    Für Verlauf, Diagramm und Erfassen (Variante B). Nach links wischen = der Wert rechts daneben, am Ende kein Umlauf.
    Passive Touch-Ereignisse, damit senkrechtes Scrollen ungestört bleibt. Am Bildschirmrand gehört die Geste dem
    System (Zurück wischen). current() liefert den aktiven Wert oder null, wenn gerade nicht gewischt werden darf.
-   pager (swipePager): folgt dem Finger, solange gewischt wird. Beim Loslassen zählt nur die Strecke, nicht die Dauer. */
-const METRIC_ORDER=['bp','temp','spo2','weight'];
+   pager (swipePager): folgt dem Finger, solange gewischt wird. Beim Loslassen zählt nur die Strecke, nicht die Dauer.
+   Gewischt wird nur über eingeschaltete Werte; ist nur Blutdruck an, gibt es gar keine Geste (auch kein Federn). */
+const metricOrder=()=>['bp',...activeVitals()];
 function onMetricSwipe(el,current,pager){
   let s=null;
   el.addEventListener('touchstart',ev=>{
@@ -284,16 +285,16 @@ function onMetricSwipe(el,current,pager){
     const t=ev.touches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
     if(!s.on){
       if(Math.abs(dx)<10&&Math.abs(dy)<10) return;
-      s.i=METRIC_ORDER.indexOf(current());
-      if(s.i<0||Math.abs(dx)<1.6*Math.abs(dy)){ s=null; return; }   // senkrecht begonnen: keine Wischgeste
+      s.order=metricOrder(); s.i=s.order.indexOf(current());
+      if(s.i<0||s.order.length<2||Math.abs(dx)<1.6*Math.abs(dy)){ s=null; return; }   // senkrecht begonnen oder nur ein Wert: keine Wischgeste
       s.on=true;
     }
-    pager.move(dx,!!METRIC_ORDER[s.i+(dx<0?1:-1)]);
+    pager.move(dx,!!s.order[s.i+(dx<0?1:-1)]);
   },{passive:true});
   el.addEventListener('touchcancel',()=>{ if(s&&s.on) pager.back(); s=null; },{passive:true});
   el.addEventListener('touchend',ev=>{
     if(!s||!s.on){ s=null; return; }
-    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, next=METRIC_ORDER[s.i+(dx<0?1:-1)]; s=null;
+    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, next=s.order[s.i+(dx<0?1:-1)]; s=null;
     if(next&&Math.abs(dx)>=56&&Math.abs(dx)>=1.6*Math.abs(dy)) pager.slideTo(next); else pager.back();
   },{passive:true});
 }
@@ -307,7 +308,7 @@ const swipeFrame=x=>({transform:'translateX('+x+'px)',opacity:1-Math.min(1,Math.
 function swipeInkAt(ink,pos){ ink.style.transform='translateX(calc('+pos+' * (100% + 4px)))'; }
 function swipePager(stage,ink,current,show,scroller){
   let dragX=0;
-  const index=()=>METRIC_ORDER.indexOf(current());
+  const index=()=>metricOrder().indexOf(current());
   const clear=()=>{ dragX=0; stage.style.transform=stage.style.opacity=ink.style.transition=''; swipeInkAt(ink,index()); };
   return {
     move(dx,canGo){
@@ -322,7 +323,7 @@ function swipePager(stage,ink,current,show,scroller){
       if(x) stage.animate([swipeFrame(x),swipeFrame(0)],SWIPE_SLIDE);
     },
     slideTo(m){
-      const dir=Math.sign(METRIC_ORDER.indexOf(m)-index());
+      const dir=Math.sign(metricOrder().indexOf(m)-index());
       if(!dir) return;
       if(prefersReduce()){ show(m); return; }
       const x=dragX, w=stage.offsetWidth;
@@ -348,6 +349,8 @@ function swipePager(stage,ink,current,show,scroller){
    Ziffern-Logik (2 oder 3 Stellen, 0 am Anfang ignorieren), Ampel und Prüf-Hinweise je Feld: vitals.js.
    Speichert über addEntry/addVital (neu) bzw. updateEntry/updateVital (Bearbeiten). */
 const CAP_MODES={bp:['sys','dia','pulse'],temp:['temp'],spo2:['spo2'],weight:['weight'],alle:['sys','dia','pulse','temp','spo2','weight']};
+/* Durchgang „alle" nur mit eingeschalteten Werten. Der Modus bleibt auch bei nur Blutdruck und Puls `alle`, sonst würde der Puls zur Pflicht. */
+const capFieldsOf=m=>m==='alle'?CAP_MODES.alle.filter(k=>!VITAL_TYPES.includes(k)||vitalOn(k)):CAP_MODES[m];
 /* Rahmenfarbe der „erledigten" Kachel (weiches Ampel-Linien-Pendant zu CAT_SOFT/-BAR). */
 const CAT_LINE={g:'color-mix(in srgb,var(--g-bar) 34%,var(--line))',
                 y:'color-mix(in srgb,var(--y-bar) 34%,var(--line))',
@@ -395,7 +398,7 @@ function startCapture(opts,returnTab){
     cap.mode=CAP_MODES[opts.mode]?opts.mode:'bp'; cap.switcher=!!opts.switcher;
     cap.note=''; cap.date=new Date();
   }
-  cap.fields=CAP_MODES[cap.mode];
+  cap.fields=capFieldsOf(cap.mode);
   $('#capTitle').textContent=cap.editing?'Messung bearbeiten':'Neue Messung';
   $('#capSave').hidden=true; $('#capDtSheet').hidden=true; $('#capNoteSheet').hidden=true;
   capSyncDateChip(); capUpdate();
@@ -454,9 +457,9 @@ function capUpdate(){
   const big=$('#capBig');
   big.textContent=rawDisplay(key,raw); big.classList.toggle('over',spo2Over(key,raw));
   $('#capUnit').textContent=def.name.toUpperCase()+' · '+def.unit;
-  const sw=$('#capSwitch'); sw.hidden=!cap.switcher;
-  $$('#capSwitch button').forEach(b=>{ const on=b.dataset.m===cap.mode; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
-  if(cap.switcher) swipeInkAt($('#capSwitchInk'),METRIC_ORDER.indexOf(cap.mode));
+  const sw=$('#capSwitch'), order=metricOrder(); sw.hidden=!cap.switcher; sw.style.setProperty('--n',order.length);
+  $$('#capSwitch button').forEach(b=>{ const on=b.dataset.m===cap.mode; b.hidden=!order.includes(b.dataset.m); b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  if(cap.switcher) swipeInkAt($('#capSwitchInk'),order.indexOf(cap.mode));
   $('#capProgress').hidden=!multi; $('#capSeg').hidden=!multi;
   if(multi){
     $$('#capProgress span').forEach(s=>{ const k=+s.dataset.i;
@@ -539,13 +542,18 @@ function capSave(){
   setTimeout(()=>{ $('#capSave').hidden=true; cap.saving=false; refreshData(); updateReminder(); backToScreen(back); },780);
 }
 
-/* ----- Großes + : Verhalten nach settings.plusMode (A Auswahl-Blatt · B direkt mit Umschalter · C alles nacheinander) ----- */
+/* ----- Großes + : Verhalten nach settings.plusMode (A Auswahl-Blatt · B direkt mit Umschalter · C alles nacheinander) -----
+   Sind nur Blutdruck und Puls an, gibt es nichts zu wählen: A ohne Blatt, B ohne Umschalter, C bleibt Modus `alle`. */
 function plusModeNow(){ return ['a','b','c'].includes(settings.plusMode)?settings.plusMode:'c'; }
 function openPlus(){
-  const m=plusModeNow();
-  if(m==='a') navPush(currentTab,'#plusSheet');
-  else if(m==='b') startCapture({mode:'bp',switcher:true});
-  else startCapture({mode:'alle'});
+  const m=plusModeNow(), more=activeVitals().length>0;
+  if(m==='c') startCapture({mode:'alle'});
+  else if(m==='a'&&more){
+    const order=metricOrder();
+    $$('#plusSheet .plus-opt').forEach(b=>{ b.hidden=!order.includes(b.dataset.m); });
+    navPush(currentTab,'#plusSheet');
+  }
+  else startCapture({mode:'bp',switcher:m==='b'&&more});
 }
 $('#plusSheet').addEventListener('click',ev=>{
   if(ev.target.closest('[data-act=close]')){ closeSheet('#plusSheet'); return; }
@@ -689,10 +697,14 @@ function getFilteredVitals(type){
   const hi=filters.to?new Date(filters.to+'T23:59:59').getTime():Infinity;
   return vitalsOf(type).filter(v=>{ const t=new Date(v.ts).getTime(); return t>=lo&&t<=hi; });
 }
-/* Umschalter-Zustand in Verlauf und Diagramm angleichen. */
+/* Umschalter in Verlauf und Diagramm angleichen: nur eingeschaltete Werte (bei nur Blutdruck gar kein Umschalter);
+   war der gewählte Wert ausgeschaltet, zurück auf Blutdruck. Läuft bei jedem Zeichnen, also immer vor dem ersten Lesen von viewMetric. */
 function syncMetricSeg(){
-  $$('.metric-seg button').forEach(b=>{ const on=b.dataset.metric===viewMetric; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
-  $$('.metric-seg-ink').forEach(ink=>swipeInkAt(ink,METRIC_ORDER.indexOf(viewMetric)));
+  const order=metricOrder();
+  if(!order.includes(viewMetric)) viewMetric='bp';
+  $$('.metric-seg').forEach(s=>{ s.hidden=order.length<2; s.style.setProperty('--n',order.length); });
+  $$('.metric-seg button').forEach(b=>{ const on=b.dataset.metric===viewMetric; b.hidden=!order.includes(b.dataset.metric); b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  $$('.metric-seg-ink').forEach(ink=>swipeInkAt(ink,order.indexOf(viewMetric)));
 }
 const vDate=d=>WD_SHORT[d.getDay()]+', '+pad2(d.getDate())+'.'+pad2(d.getMonth()+1)+'.';
 let vRowIntro=true;                                     // false beim Seitenwechsel: dann gleitet die ganze Liste, die Zeilen blenden nicht einzeln ein
@@ -1206,7 +1218,7 @@ const dCount=(n,type)=>'<span data-count="'+n+'"'+(type?' data-type="'+type+'"':
 function renderDashboard(){
   const host=$('#dashboard'); if(!host) return;
   const de=$('#dashDate'); if(de) de.textContent=fmtLongDate(new Date());
-  if(!totalCount()){
+  if(!entries.length&&!visibleVitals().length){          // auch bei nur ausgeblendeten Werten und keinem Blutdruck
     host.innerHTML='<div class="dcard" style="padding:22px 18px;text-align:center">'
       +'<div style="font-size:15px;font-weight:800;margin-bottom:6px">Noch keine Messung erfasst.</div>'
       +'<div style="font-size:13px;color:var(--muted);line-height:1.5">Tippe unten auf das <b style="color:var(--accent)">+</b>, um deine erste Messung einzutragen.</div>'
@@ -1229,16 +1241,20 @@ function renderDashboard(){
   }else{
     html+='<div class="dcard dlm dlm-none">'+dHead(icSvg(IC_PATH_BP),'Blutdruck','Noch kein Wert')+'</div>';
   }
-  /* --- Letzte Messung: Temperatur | Sauerstoff, darunter Gewicht über die ganze Breite (ohne Ampel) --- */
-  const lastVital=type=>{
-    const M=METRICS[type], last=vitalsOf(type).sort(byTsDesc)[0], amp=hasAmpel(type), cls='dcard dlm'+(amp?'':' dlm-wide');
+  /* --- Letzte Messung: je nachdem, welche Werte eingeschaltet sind. Alle drei: Temperatur | Sauerstoff, darunter Gewicht
+         über die ganze Breite. Zwei: nebeneinander, oben ausgerichtet. Einer allein: über die ganze Breite. --- */
+  const lastVital=(type,wide)=>{
+    const M=METRICS[type], last=vitalsOf(type).sort(byTsDesc)[0], amp=hasAmpel(type), cls='dcard dlm'+(wide?' dlm-wide':'');
     if(!last) return '<div class="'+cls+' dlm-none">'+dHead(icSvg(M.icon),M.name,'Noch kein Wert')+'</div>';
     const k=catMetric(type,last.value);
+    const val='<span class="dlm-val sm tnum" style="color:'+metricInk(type,k.c)+'"><span class="dlm-n">'+dCount(last.value,type)+'</span><span class="dlm-u"> '+M.unit+'</span></span>';
     return '<button type="button" class="'+cls+'" data-det="'+last.id+'">'+dHead(icSvg(M.icon),M.name,relTime(last.ts))
-      +'<span class="dlm-val sm tnum" style="color:'+metricInk(type,k.c)+'"><span class="dlm-n">'+dCount(last.value,type)+'</span><span class="dlm-u"> '+M.unit+'</span></span>'
-      +(amp?dWord(k.c,k.t):'')+'</button>';
+      +(amp&&wide?'<span class="dlm-side">'+val+dWord(k.c,k.t)+'</span>':val+(amp?dWord(k.c,k.t):''))+'</button>';
   };
-  html+='<div class="dlm-row">'+lastVital('temp')+lastVital('spo2')+'</div>'+lastVital('weight');
+  const lv=activeVitals();
+  if(lv.length===3) html+='<div class="dlm-row">'+lastVital('temp')+lastVital('spo2')+'</div>'+lastVital('weight',true);
+  else if(lv.length===2) html+='<div class="dlm-row">'+lastVital(lv[0])+lastVital(lv[1])+'</div>';
+  else if(lv.length===1) html+=lastVital(lv[0],true);
 
   /* --- Letzte 7 Tage: Ø erst ab 3 Messungen, Ampelfarbe + Wort auf dem gerundeten Ø --- */
   html+='<h2 class="dsec">Letzte 7 Tage</h2>';
@@ -1262,8 +1278,8 @@ function renderDashboard(){
       +'</span>';
   }
   html+='</button>';
-  // Temperatur, Sauerstoff, Gewicht
-  VITAL_TYPES.forEach(type=>{
+  // Temperatur, Sauerstoff, Gewicht (soweit eingeschaltet)
+  activeVitals().forEach(type=>{
     const M=METRICS[type], l7=vitalsOf(type).filter(v=>ageDays(v.ts)<=7), avg=meanMetric(l7);
     const k=l7.length>=DASH_MIN?catMetric(type,avg):{c:'n',t:''};
     html+='<button type="button" class="dcard dst" data-chart="'+type+'"><span class="dst-top">'+dHead(icSvg(M.icon),M.name,'Ø 7 Tage · '+M.unit)
@@ -1313,12 +1329,15 @@ function download(blob,name){
 }
 const csvCell=v=>{ v=String(v); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
 /* Eine Zeile je Datensatz, nach Zeit sortiert; Spalten anderer Werte bleiben leer (nichts wird anhand
-   gleicher Uhrzeiten zusammengelegt). Temperatur und Gewicht mit Dezimalkomma fürs deutsche Excel. */
+   gleicher Uhrzeiten zusammengelegt). Temperatur und Gewicht mit Dezimalkomma fürs deutsche Excel.
+   Ausgeblendete Werte fehlen samt Spalte (das Backup enthält sie weiterhin). */
+const CSV_COL={temp:'Temperatur (°C)',spo2:'SpO2 (%)',weight:'Gewicht (kg)'};
 function exportCSV(){
-  if(!totalCount()){ toast('Noch keine Werte zum Exportieren','notice'); return; }
-  const rows=[['Datum','Uhrzeit','Systolisch','Diastolisch','Puls','Temperatur (°C)','SpO2 (%)','Gewicht (kg)','Notiz']];
-  const all=entries.map(e=>({ts:e.ts,c:[e.sys,e.dia,Number.isFinite(e.pulse)?e.pulse:'',...VITAL_TYPES.map(()=>'')],note:e.note}))
-    .concat(vitals.map(v=>({ts:v.ts,c:['','','',...VITAL_TYPES.map(t=>v.type===t?fmtMetric(t,v.value):'')],note:v.note})));
+  const types=activeVitals(), shown=visibleVitals();
+  if(!entries.length&&!shown.length){ toast('Noch keine Werte zum Exportieren','notice'); return; }
+  const rows=[['Datum','Uhrzeit','Systolisch','Diastolisch','Puls',...types.map(t=>CSV_COL[t]),'Notiz']];
+  const all=entries.map(e=>({ts:e.ts,c:[e.sys,e.dia,Number.isFinite(e.pulse)?e.pulse:'',...types.map(()=>'')],note:e.note}))
+    .concat(shown.map(v=>({ts:v.ts,c:['','','',...types.map(t=>v.type===t?fmtMetric(t,v.value):'')],note:v.note})));
   all.sort((a,b)=>new Date(a.ts)-new Date(b.ts))
     .forEach(r=>rows.push([fmtDate(r.ts),fmtTime(r.ts),...r.c,(r.note||'').replace(/\r?\n/g,' ')]));
   const csv='﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
@@ -1331,7 +1350,7 @@ function exportCSV(){
 function backupName(){ return `blutdruck-pro-backup-${stampDateTime()}.txt`; }
 const BACKUP_VER=3;   // Version 3: zusätzlich `vitals` (Temperatur, Sauerstoff, Gewicht); entries bleibt unverändert lesbar für die alte App
 /* Nur die „Vorlieben" sichern – geräte-interne Erinnerungs-Merker (firstDirtyAt/snoozeUntil) bleiben außen vor. */
-function backupSettings(){ const {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode}=settings; return {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode}; }
+function backupSettings(){ const {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode,hiddenVitals}=settings; return {colorDots,guideLines,theme,accent,reminderDays,thr,plusMode,hiddenVitals}; }
 function backupData(){ return {app:'blutdruck',version:BACKUP_VER,exportedAt:new Date().toISOString(),entries,vitals,settings:backupSettings()}; }
 function backupBlob(){ return new Blob([JSON.stringify(backupData(),null,2)],{type:'text/plain'}); }
 function exportJSON(){
@@ -1414,8 +1433,7 @@ async function pickBackupFile(){
     await idbSetMeta('backupHandle',handle);
     await writeToHandle(handle);
     await refreshLinkFileUI();
-    toast(merged&&merged.added ? 'Verknüpft · '+merged.added+' neu übernommen' : 'Backup-Datei verknüpft');
-    if(merged) offerSettingsRestore(merged.settings);
+    restoreDone(merged&&merged.added ? 'Verknüpft · '+merged.added+' neu übernommen' : 'Backup-Datei verknüpft',merged);
   }catch(e){ if(e&&e.name!=='AbortError') toast('Verknüpfen fehlgeschlagen','error'); }
 }
 /* Verknüpfung lösen: die Datei selbst bleibt unangetastet, nur das Handle wird vergessen. */
@@ -1445,7 +1463,8 @@ async function autoBackupIfLinked(){
 let _abT=0;
 function scheduleAutoBackup(){ clearTimeout(_abT); _abT=setTimeout(autoBackupIfLinked,1500); }
 /* Merge-Kern, geteilt von „Backup wiederherstellen" und „Bestehende Datei wählen": vereinigt die
-   übergebenen Daten mit den vorhandenen Einträgen (nach id). Gibt {added,updated} zurück oder null,
+   übergebenen Daten mit den vorhandenen Einträgen (nach id), egal wie die Messwerte-Schalter stehen.
+   Gibt {added,updated,settings,fileCounts} zurück (fileCounts = Vitalwerte je Art in der Datei) oder null,
    wenn nichts Gültiges drinsteckt. */
 function mergeEntriesFromData(data){
   const obj=(!Array.isArray(data)&&data&&typeof data==='object')?data:null;
@@ -1465,14 +1484,34 @@ function mergeEntriesFromData(data){
   vvalid.forEach(v=>{ if(vmap.has(v.id)) updated++; else added++; vmap.set(v.id,v); });
   entries=[...map.values()]; vitals=[...vmap.values()];
   saveEntries(); saveVitals(); markDirty(); refreshData();
-  return {added,updated,settings:(obj&&obj.settings)||null};
+  const fileCounts={}; vvalid.forEach(v=>{ fileCounts[v.type]=(fileCounts[v.type]||0)+1; });
+  return {added,updated,settings:(obj&&obj.settings)||null,fileCounts};
+}
+/* Zusatzsatz nach dem Wiederherstellen: was aus der Datei gerade ausgeblendet ist. '' = nichts. */
+function hiddenInFileNote(fileCounts){
+  const p=VITAL_TYPES.filter(t=>!vitalOn(t)&&fileCounts[t]).map(t=>fileCounts[t]+' '+METRICS[t].name);
+  return p.length?'Ausgeblendet: '+p.join(' · ')+'. Einschalten im Menü.':'';
+}
+/* Abschluss beider Wege (Wiederherstellen, Datei verknüpfen). Steckt die Datei voller Einstellungen, folgt erst das
+   Fenster, denn dort können sich die Schalter noch ändern. Ohne Einstellungen kommt der Zusatzsatz sofort mit in die Meldung. */
+function restoreDone(msg,res){
+  const withSettings=!!res&&!!res.settings&&typeof res.settings==='object';
+  const note=res&&!withSettings?hiddenInFileNote(res.fileCounts):'';
+  toast(note?msg+'. '+note:msg,note?'notice':'success');
+  if(withSettings) offerSettingsRestore(res);
 }
 /* Im Backup enthaltene Einstellungen auf Wunsch übernehmen (geteilt von „Wiederherstellen" und „Auswählen"/„Ändern"). */
-let _pendingRestoreSettings=null;
-function offerSettingsRestore(s){
-  if(!s || typeof s!=='object') return;
-  _pendingRestoreSettings=s;
+let _pendingRestore=null;
+function offerSettingsRestore(res){
+  _pendingRestore=res;
   $('#restoreDlg').showModal();          // eigenes Fenster statt Browser-confirm (sprechende Knopf-Texte)
+}
+/* Nach der Wahl im Fenster (einmalig; das close-Ereignis deckt „Nur die Werte", Raustippen und Esc ab). */
+function finishRestore(takeSettings){
+  const p=_pendingRestore; _pendingRestore=null; if(!p) return;
+  if(takeSettings) applyBackupSettings(p.settings);
+  const done=takeSettings?'Einstellungen übernommen':'', note=hiddenInFileNote(p.fileCounts);
+  if(done||note) toast(done&&note?done+'. '+note:done||note,note?'notice':'success');
 }
 function applyBackupSettings(s){
   const curThr=settings.thr;
@@ -1480,16 +1519,16 @@ function applyBackupSettings(s){
   // Grenzen zusammenführen statt ersetzen: fehlen sie im Backup (alte App), bleiben die aktuellen Werte erhalten.
   settings.thr=Object.assign({},SET_DEFAULT.thr,curThr||{},(s.thr&&typeof s.thr==='object')?s.thr:{});
   if(!['a','b','c'].includes(settings.plusMode)) settings.plusMode='c';
-  saveSettings(); applyTheme(); applySettingsUI(); renderTable();
-  if(currentTab==='chart') renderChart();
-  toast('Einstellungen übernommen');
+  // Messwerte-Schalter: fehlt die Angabe im Backup, bleiben die aktuellen stehen.
+  if(Array.isArray(s.hiddenVitals)) settings.hiddenVitals=VITAL_TYPES.filter(t=>s.hiddenVitals.includes(t));
+  saveSettings(); applyTheme(); applySettingsUI(); refreshData();   // refreshData: auch Dashboard und Umschalter; ein ausgeschalteter Wert springt auf Blutdruck zurück
 }
 function importJSON(file){
   const r=new FileReader();
   r.onload=()=>{
     let res=null;
     try{ res=mergeEntriesFromData(JSON.parse(r.result)); }catch{}
-    if(res){ toast(`Wiederhergestellt: ${res.added} neu, ${res.updated} aktualisiert`); offerSettingsRestore(res.settings); }
+    if(res) restoreDone(`Wiederhergestellt: ${res.added} neu, ${res.updated} aktualisiert`,res);
     else toast('Wiederherstellen fehlgeschlagen: ungültige Datei','error');
   };
   r.readAsText(file);
@@ -1499,7 +1538,7 @@ function importJSON(file){
    Auto-Backup wird abgebrochen und die Verknüpfung gelöst. */
 const joinUnd=a=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' und '+a[a.length-1];
 async function clearAllData(){
-  const n=totalCount(), parts=countParts(), word=n===1?'Messung':'Messungen';
+  const n=totalCount(), parts=countParts('all'), word=n===1?'Messung':'Messungen';
   const ok=await askConfirm({
     icon:'trash',tone:'danger',danger:true,title:'Alle Daten löschen?',
     messageHTML:(n===1?'Die <b>1 Messung</b> wird':'Alle <b>'+n+' '+word+'</b> werden')+' dauerhaft gelöscht'+(parts.length?': '+joinUnd(parts):'')+'. Das lässt sich nicht rückgängig machen.',
@@ -1576,7 +1615,7 @@ $$('#menuDlg .acc-head[aria-controls]').forEach(h=>h.addEventListener('click',()
     });
   }
 }));
-/* ---------- Anleitung: 10 Themen zum Aufklappen ----------
+/* ---------- Anleitung: 11 Themen zum Aufklappen ----------
    Immer nur ein Thema offen; das geöffnete rutscht nach oben, damit sein Text zu sehen ist. */
 function closeHelpTopics(){
   $$('#helpDlg .hlp-head').forEach(o=>{ o.setAttribute('aria-expanded','false'); $('#'+o.getAttribute('aria-controls')).hidden=true; o.parentElement.classList.remove('open'); });
@@ -1767,9 +1806,11 @@ const thrDone=(r,text)=>(r.dec?/^\d{2}[.,]\d$/:/^\d{2,3}$/).test(String(text).tr
 /* Beim Verlassen darf die Temperatur auch ohne Nachkommastelle stehen (37 → 37,0). */
 const thrLeaveOk=(r,text)=>(r.dec?/^\d{2}([.,]\d)?$/:/^\d{2,3}$/).test(String(text).trim());
 const ERR_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4"/><path d="M12 17.5h.01"/></svg>';
+/* Leisten nur für eingeschaltete Werte; die Grenzen ausgeblendeter Werte bleiben gespeichert und im Backup. */
+const shownThrRows=()=>THR_ROWS.filter(r=>!VITAL_TYPES.includes(r.id)||vitalOn(r.id));
 function renderThrBars(){
   const host=$('#thrBars'); if(!host) return;
-  host.innerHTML=THR_ROWS.map(r=>{
+  host.innerHTML=shownThrRows().map(r=>{
     let sum=0; const cuts=[];
     const seg=r.seg.map((s,i)=>{ if(i) cuts.push(sum); sum+=s[2]; return '<span class="thr-seg '+s[0]+'" style="flex-basis:'+s[2]+'%">'+s[1]+'</span>'; }).join('');
     const chips=r.keys.map((k,i)=>'<label class="thr-lab" style="left:calc('+cuts[i]+'% - 26px)">'+
@@ -1786,10 +1827,10 @@ function showThrErr(inp,msg){
   const box=inp.closest('.thr-row').querySelector('.thr-err');
   box.querySelector('span').textContent=msg; box.hidden=!msg;
 }
-let _thrChanged=false;   // Grenzen geändert → beim Schließen des Menüs alle Ansichten neu einfärben
+let _viewsStale=false;   // Grenzen oder Messwerte-Schalter geändert → beim Schließen des Menüs alle Ansichten neu aufbauen
 function applyThr(k,v){
   if(+settings.thr[k]===v) return;
-  settings.thr[k]=v; saveSettings(); _thrChanged=true; updateTargetSummary();
+  settings.thr[k]=v; saveSettings(); _viewsStale=true; updateTargetSummary();
   renderTable(); if(currentTab==='chart') renderChart();   // Echtzeit: Verlauf (und Diagramm, falls offen)
 }
 function thrRowOf(inp){ return THR_ROWS.find(x=>x.id===inp.dataset.row); }
@@ -1811,9 +1852,9 @@ $('#thrBars').addEventListener('focusout',e=>{
 });
 $('#thrBars').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.closest('.thr-in')) e.target.blur(); });
 function applyThrUI(){ renderThrBars(); updateTargetSummary(); }
-/* Stand-Zeile „Zielbereich": „Eigene Werte", sobald eine der 9 Grenzen vom Standard abweicht. */
+/* Stand-Zeile „Zielbereich": „Eigene Werte", sobald eine der sichtbaren Grenzen vom Standard abweicht. */
 function updateTargetSummary(){
-  const custom=Object.keys(SET_DEFAULT.thr).some(k=>+settings.thr[k]!==+SET_DEFAULT.thr[k]);
+  const custom=shownThrRows().flatMap(r=>r.keys).some(k=>+settings.thr[k]!==+SET_DEFAULT.thr[k]);
   $('#sumTarget').textContent=custom?'Eigene Werte':'Standardwerte';
 }
 /* Akzent-Auswahl: Punkte komplett neu bauen statt nur umzufärben, denn Hell und Dunkel haben
@@ -1837,24 +1878,58 @@ function applyAccentSwatches(){
 }
 function applyThemeSeg(){ $$('#themeSeg [data-theme]').forEach(b=>b.classList.toggle('active',b.dataset.theme===settings.theme)); }
 /* Neue Messung (Plus-Button): drei Wahlzeilen, gilt sofort beim Antippen (wie die Akzentfarbe). */
-function applyPlusPick(){ const m=plusModeNow(); $$('#plusPick .pp-opt').forEach(b=>b.setAttribute('aria-pressed',b.dataset.plus===m?'true':'false')); }
+/* Sind nur Blutdruck und Puls an, ist die Wahl ohne Wirkung: ausgegraut mit Begründung, settings.plusMode bleibt gespeichert. */
+function applyPlusPick(){
+  const m=plusModeNow(), off=!activeVitals().length;
+  $$('#plusPick .pp-opt').forEach(b=>{ b.setAttribute('aria-pressed',b.dataset.plus===m?'true':'false'); b.disabled=off; });
+  $('#plusPickNote').hidden=!off;
+}
 $('#plusPick').addEventListener('click',e=>{
   const b=e.target.closest('.pp-opt'); if(!b) return;
   settings.plusMode=b.dataset.plus; saveSettings(); applyPlusPick();
+});
+/* ---------- Menü „Messwerte": Temperatur, Sauerstoff und Gewicht ein- und ausschalten ----------
+   Wirkt sofort, ohne Rückfrage, und löscht nichts. saveSettings (Auto-Backup ja), aber kein markDirty, die Werte bleiben ja gleich.
+   Die Zeilen werden einmal gebaut und danach nur angeglichen, sonst liefe die Bewegung des Schalters nicht. */
+function renderMetricRows(){
+  const host=$('#mvRows');
+  if(!host.firstChild){
+    const row=(icon,name,sub,cls,attrs)=>'<div class="mv-row"><span class="plus-ic">'+icSvg(icon)+'</span><span class="mv-txt"><span class="mv-t">'+name+'</span>'
+      +'<span class="mv-s">'+sub+'</span></span><button class="rp-toggle'+cls+'" type="button" role="switch" '+attrs+'><span class="rp-knob"></span></button></div>';
+    host.innerHTML=row(IC_PATH_BP,'Blutdruck und Puls','Immer dabei',' on','aria-checked="true" aria-label="Blutdruck und Puls, immer dabei" disabled')
+      +VITAL_TYPES.map(t=>row(METRICS[t].icon,METRICS[t].name,'','','aria-label="'+METRICS[t].name+'" data-vital="'+t+'"')).join('');
+  }
+  VITAL_TYPES.forEach(t=>{
+    const on=vitalOn(t), n=vitalsOf(t).length, b=$('[data-vital="'+t+'"]',host);
+    b.classList.toggle('on',on); b.setAttribute('aria-checked',on?'true':'false');
+    b.closest('.mv-row').querySelector('.mv-s').textContent=n?n+(n===1?' Wert':' Werte')+(on?'':' ausgeblendet'):'Noch keine Werte';
+  });
+  const off=VITAL_TYPES.filter(t=>!vitalOn(t)).map(t=>METRICS[t].name);
+  $('#sumMetrics').textContent=!off.length?'Alle Werte an':off.length===VITAL_TYPES.length?'Nur Blutdruck und Puls':'Ohne '+joinUnd(off);
+}
+$('#mvRows').addEventListener('click',e=>{
+  const b=e.target.closest('[data-vital]'); if(!b) return;
+  const t=b.dataset.vital;
+  settings.hiddenVitals=vitalOn(t)?[...settings.hiddenVitals,t]:settings.hiddenVitals.filter(x=>x!==t);
+  saveSettings(); _viewsStale=true;
+  renderMetricRows(); applyThrUI(); applyPlusPick(); updateDataSummary();   // Abhängiges im selben Menü sofort
+  renderTable(); if(currentTab==='chart') renderChart();                    // Dashboard baut refreshData beim Schließen
 });
 /* Stand-Zeilen unter den Abschnittsnamen (Backup macht renderBackupState, Zielbereich updateTargetSummary). */
 const THEME_LBL={light:'Hell',dark:'Dunkel',auto:'Auto'};
 function updateViewSummary(){ $('#sumView').textContent=(THEME_LBL[settings.theme]||'Auto')+' · '+resolveAccent(resolveDark()).label; }
 function updateDataSummary(){
-  const n=totalCount(), parts=countParts();
-  $('#sumData').textContent=n?n+(n===1?' Messung':' Messungen'):'Noch keine Messungen';
-  $('#csvNote').textContent=parts.length?parts.join(' · '):'Noch keine Messungen';
+  const n=totalCount(), shown=countParts('shown'), hid=countParts('hidden');
+  $('#sumData').textContent=n?n+(n===1?' Messung':' Messungen'):'Noch keine Messungen';      // Stand-Zeile zählt alles, auch Ausgeblendete
+  $('#csvNote').innerHTML=(shown.length?shown.join(' · '):'Noch keine Messungen')
+    +(hid.length?'<br>Nicht in der CSV, weil ausgeblendet: '+hid.join(' · '):'');
 }
 function applySettingsUI(){
   applyThemeSeg();
   applyThrUI();
   applyAccentSwatches();
   applyPlusPick();
+  renderMetricRows();
   renderBackupState();
   updateDataSummary();
 }
@@ -1872,8 +1947,8 @@ $('#menuBtn').addEventListener('click',openMenu);
 // Android-Warnung immer, wenn das automatische Backup hier überhaupt geht (verknüpft oder nicht).
 $('#fsWarn').hidden=!FS_SUPPORTED;
 $('#menuClose').addEventListener('click',()=>$('#menuDlg').close());
-// Grenzen geändert? Dann beim Schließen alles neu einfärben (Dashboard, Detail …).
-$('#menuDlg').addEventListener('close',()=>{ if(_thrChanged){ _thrChanged=false; refreshData(); } });
+// Grenzen oder Messwerte-Schalter geändert? Dann beim Schließen alles neu aufbauen (Dashboard, Detail …).
+$('#menuDlg').addEventListener('close',()=>{ if(_viewsStale){ _viewsStale=false; refreshData(); } });
 // Schließen nur, wenn der Klick die Backdrop-Fläche (das Dialog-Element selbst) trifft –
 // robust gegen das Neu-Zentrieren beim Auf-/Zuklappen der Abschnitte.
 $('#menuDlg').addEventListener('click',e=>{ if(e.target===e.currentTarget) e.currentTarget.close(); });
@@ -1881,10 +1956,10 @@ $('#helpClose').addEventListener('click',()=>$('#helpDlg').close());
 $('#helpBack').addEventListener('click',()=>{ $('#helpDlg').close(); openMenu(); });   // zurück ins Menü
 $('#helpDlg').addEventListener('click',e=>{ if(e.target===e.currentTarget) e.currentTarget.close(); });
 // Wiederherstellen-Rückfrage: oben Werte+Einstellungen, unten nur Werte. Raustippen/Esc = nur Werte.
-$('#restoreWith').addEventListener('click',()=>{ $('#restoreDlg').close(); const s=_pendingRestoreSettings; _pendingRestoreSettings=null; if(s) applyBackupSettings(s); });
-$('#restoreOnly').addEventListener('click',()=>{ _pendingRestoreSettings=null; $('#restoreDlg').close(); });
-$('#restoreDlg').addEventListener('cancel',()=>{ _pendingRestoreSettings=null; });
-$('#restoreDlg').addEventListener('click',e=>{ if(e.target===e.currentTarget){ _pendingRestoreSettings=null; e.currentTarget.close(); } });
+$('#restoreWith').addEventListener('click',()=>{ $('#restoreDlg').close(); finishRestore(true); });
+$('#restoreOnly').addEventListener('click',()=>$('#restoreDlg').close());
+$('#restoreDlg').addEventListener('click',e=>{ if(e.target===e.currentTarget) e.currentTarget.close(); });
+$('#restoreDlg').addEventListener('close',()=>finishRestore(false));   // nach „übernehmen" schon erledigt, dann passiert hier nichts
 // Bestätigen-Rückfrage (#confirmDlg): OK setzt returnValue='ok', alles andere (Abbrechen/Esc/daneben) = Abbruch.
 $('#confirmOk').addEventListener('click',()=>{ const d=$('#confirmDlg'); d.returnValue='ok'; d.close(); });
 $('#confirmCancel').addEventListener('click',()=>{ const d=$('#confirmDlg'); d.returnValue=''; d.close(); });
@@ -1902,8 +1977,8 @@ $('#accentPick').addEventListener('click',e=>{
   const b=e.target.closest('.acc-sw'); if(!b) return;
   settings.accent=b.dataset.accent; saveSettings(); applyAccent(); applyAccentSwatches(); if(currentTab==='chart') renderChart();
 });
-// Setzt alle neun Grenzen zurück.
-$('#thrReset').addEventListener('click',()=>{ settings.thr={...SET_DEFAULT.thr}; saveSettings(); _thrChanged=true; applyThrUI(); renderTable(); if(currentTab==='chart') renderChart(); toast('Standardwerte wiederhergestellt','notice'); });
+// Setzt die sichtbaren Grenzen zurück; die ausgeblendeter Werte bleiben unangetastet.
+$('#thrReset').addEventListener('click',()=>{ shownThrRows().flatMap(r=>r.keys).forEach(k=>{ settings.thr[k]=SET_DEFAULT.thr[k]; }); saveSettings(); _viewsStale=true; applyThrUI(); renderTable(); if(currentTab==='chart') renderChart(); toast('Standardwerte wiederhergestellt','notice'); });
 
 /* ==================== ARZT-REPORT (Druck/PDF) ====================
    Aufbereiteter, druckbarer Bericht für den Arztbesuch (Kompakt-Layout + Querformat-Anhang),
@@ -1912,7 +1987,8 @@ $('#thrReset').addEventListener('click',()=>{ settings.thr={...SET_DEFAULT.thr};
    Der Report ist IMMER hell (Druck auf Weiß): eigene feste Palette RP statt der theme-abhängigen
    CSS-Variablen; das App-Diagramm (buildDiagChart) bleibt unberührt – der Report bringt seine
    eigene Grafik mit. Der Zustand (reportState) ist BEWUSST flüchtig: bei jedem Öffnen auf Standard
-   (Kobalt, 30 Tage, Puls+Namensfeld an, Anhang aus). Nichts davon landet in settings/Backup. */
+   (Kobalt, 30 Tage, Puls+Namensfeld+Vitalwerte an, Anhang aus). Nichts davon landet in settings/Backup.
+   Temperatur, Sauerstoff und Gewicht haben je einen Schalter (Schlüssel = Typ); er erscheint nur, wenn der Wert unter Messwerte an ist. */
 const RP={
   ink:'#131a26', muted:'#68717f', faint:'#9aa3b2', surf:'#ffffff', surf2:'#f4f6fa', line:'#e5e9f0',
   amp:{ g:{soft:'#e7f6ec',bar:'#16a34a',ink:'#15803d',label:'Im Ziel'},
@@ -1923,7 +1999,8 @@ const RP={
   acc:{Kobalt:'#1E5FE0',Indigo:'#3B3F9E',Petrol:'#0E7C93',Violett:'#7048C4',Graphit:'#3C4A5E'}
 };
 const RP_ACC_ORDER=['Kobalt','Indigo','Petrol','Violett','Graphit'];
-let reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true,gewicht:true};
+const rpDefaults=()=>({accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,temp:true,spo2:true,weight:true});
+let reportState=rpDefaults();
 const rpAcc=()=>RP.acc[reportState.accent]||RP.acc.Kobalt;
 
 const rpIso=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
@@ -2125,12 +2202,13 @@ function rpLandscape(rep,pageNo){
     : `<div style="flex:1;background:${RP.surf2};border-radius:16px;padding:15px 17px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};margin-bottom:10px">BLUTDRUCKVERLAUF · WERT & DATUM JE MESSPUNKT</div><div style="flex:1;display:flex;align-items:stretch">${rpChart(rep,1035,puls,acc,true)}</div>${rpLegend(puls)}</div>`;
   return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpFoot(rep,'Seite '+(pageNo||2)+' · Anhang',{noTod:true})}</div>`;
 }
-/* ---- A4-Seite „Temperatur, Sauerstoff & Gewicht" (Hochformat, nach Seite 1; zwei Schalter im Report-Menü) ----
+/* ---- A4-Seite „Temperatur, Sauerstoff & Gewicht" (Hochformat, nach Seite 1; je Wert ein Schalter im Report-Menü) ----
    Gleiche Bausteine und feste helle Palette wie Seite 1. Je Wert: Ø in Ampelfarbe + Ampel-Wort
    (catMetric auf dem gerundeten Ø, Gewicht ohne Ampel), Tiefst–Höchst, Anzahl, Verlauf; darunter eine gemeinsame
    Werteliste. Rein beschreibend, keine Bewertung. Spezifikation: arzt-report-spezifikation.md, Abschnitt 9.
-   temp/spo2/weight zählen immer alles im Zeitraum (Report-Menü); was auf die Seiten kommt, steht in metrics und
-   richtet sich nach den Schaltern. Ohne Gewicht im Zeitraum sieht die Seite aus wie zuvor. */
+   temp/spo2/weight zählen immer alles im Zeitraum (Report-Menü); was auf die Seiten kommt, steht in metrics und richtet
+   sich nach Messwerte-Schalter UND Report-Schalter. Temperatur und Sauerstoff: Hat einer von beiden Werte, zeigt der andere
+   seine Kachel „Keine Werte im Zeitraum" (nur wenn er gewählt ist). Gewicht ohne Werte entfällt. */
 function reportVitals(from,to){
   const lo=new Date(from.getFullYear(),from.getMonth(),from.getDate()).getTime();
   const hi=new Date(to.getFullYear(),to.getMonth(),to.getDate(),23,59,59,999).getTime();
@@ -2142,15 +2220,17 @@ function reportVitals(from,to){
       min:vals.length?Math.min(...vals):null,max:vals.length?Math.max(...vals):null};
   };
   const temp=per('temp'), spo2=per('spo2'), weight=per('weight');
-  const withTS=reportState.vital&&temp.count+spo2.count>0, withW=reportState.gewicht&&weight.count>0;
-  const metrics=[...(withTS?[temp,spo2]:[]),...(withW?[weight]:[])];
+  const picked=m=>vitalOn(m.type)&&reportState[m.type], ts=[temp,spo2].filter(picked);
+  const metrics=[...(ts.some(m=>m.count)?ts:[]),...(picked(weight)&&weight.count?[weight]:[])];
   const shown=list.filter(v=>metrics.some(m=>m.type===v.type));
   // Werteliste: Werte mit GLEICHEM Zeitpunkt (Durchgang „Alles nacheinander") in einer Zeile.
   const byTs=new Map();
   shown.forEach(v=>{ const r=byTs.get(v.ts)||{ts:v.ts,notes:[]}; r[v.type]=v.value; if(v.note&&!r.notes.includes(v.note)) r.notes.push(v.note); byTs.set(v.ts,r); });
   const rows=[...byTs.values()].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  const title=withTS&&withW?'Temperatur, Sauerstoff & Gewicht':withW?'Gewicht':'Temperatur & Sauerstoff';
-  return {count:shown.length,temp,spo2,weight,metrics,withTS,withW,rows,title};
+  const names=metrics.map(m=>METRICS[m.type].name);   // „Temperatur" · „Temperatur & Gewicht" · „Temperatur, Sauerstoff & Gewicht"
+  const title=names.length>2?names.slice(0,-1).join(', ')+' & '+names[names.length-1]:names.join(' & ');
+  const withAmpel=metrics.some(m=>m.count&&hasAmpel(m.type));
+  return {count:shown.length,temp,spo2,weight,metrics,withAmpel,rows,title};
 }
 /* Farben eines Messpunkts: Ampel, beim Gewicht Akzentfarbe (Punkt) und normale Schrift (Zahl). */
 const rpVAmp=(type,v)=>hasAmpel(type)?(RP.amp[catMetric(type,v).c]||RP.amp.n):{bar:rpAcc(),ink:RP.ink};
@@ -2227,13 +2307,15 @@ function rpVitalPage(rep,vrep,pageLabel){
       +tc.map(c=>valCell(c[0],r[c[0]])).join('')
       +`<div style="font-size:11px;font-weight:500;color:${RP.muted};line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes.length?escapeHtml(r.notes.join(' · ')):'—'}</div></div>`; });
   const table=`<div class="rp-tabletile" style="background:${RP.surf};border:1px solid ${RP.line};border-radius:16px;overflow:hidden"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};padding:13px 15px 6px">ALLE WERTE · ${vrep.count}</div><div style="padding:0 4px 8px">${rows}</div></div>`;
-  return `<div class="rp-page" style="width:794px;min-height:1123px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:38px 40px 34px"><div style="display:flex;flex-direction:column;gap:13px;flex:1">${header}${vrep.metrics.map(metricTile).join('')}${table}</div>${rpVFoot(pageLabel,vrep.withTS)}</div>`;
+  return `<div class="rp-page" style="width:794px;min-height:1123px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:38px 40px 34px"><div style="display:flex;flex-direction:column;gap:13px;flex:1">${header}${vrep.metrics.map(metricTile).join('')}${table}</div>${rpVFoot(pageLabel,vrep)}</div>`;
 }
-/* Fußzeile der Vitalwerte-Seiten: angewendete Grenzen (settings.thr, nur mit Temperatur/Sauerstoff) + Haftungshinweis. */
-function rpVFoot(pageLabel,withTS){
-  const t=settings.thr, f=v=>String(v).replace('.',',');
+/* Fußzeile der Vitalwerte-Seiten: angewendete Grenzen (settings.thr, nur für Werte, die im Bericht stehen) + Haftungshinweis. */
+function rpVFoot(pageLabel,vrep){
+  const t=settings.thr, f=v=>String(v).replace('.',','), inRep=x=>vrep.metrics.some(m=>m.type===x&&m.count);
+  const lim=[...(inRep('temp')?[`Temperatur normal ab ${fmtMetric('temp',t.tempLow)} °C (darunter niedrig), erhöht ab ${fmtMetric('temp',t.tempY)} °C, Fieber ab ${fmtMetric('temp',t.tempR)} °C`]:[]),
+    ...(inRep('spo2')?[`Sauerstoff im Ziel ab ${f(t.spo2G)} %, niedrig ab ${f(t.spo2Y)} %, darunter zu niedrig`]:[])];
   return `<div style="margin-top:auto;padding-top:18px;border-top:1px solid ${RP.line};font-size:10.5px;line-height:1.5;color:${RP.muted};display:flex;justify-content:space-between;gap:16px"><div style="max-width:760px;display:flex;flex-direction:column;gap:4px">`
-    +(!withTS?'':`<div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>Temperatur normal ab ${fmtMetric('temp',t.tempLow)} °C (darunter niedrig), erhöht ab ${fmtMetric('temp',t.tempY)} °C, Fieber ab ${fmtMetric('temp',t.tempR)} °C · Sauerstoff im Ziel ab ${f(t.spo2G)} %, niedrig ab ${f(t.spo2Y)} %, darunter zu niedrig.</div>`)
+    +(lim.length?`<div><b style="color:${RP.ink}">Angewendete Grenzwerte: </b>${lim.join(' · ')}.</div>`:'')
     +`<div>Rein beschreibende Auswertung der erfassten Werte — keine ärztliche Bewertung oder Diagnose.</div></div><div style="text-align:right;white-space:nowrap">Blutdruck Pro<br>${pageLabel}</div></div>`;
 }
 /* Anhang Temperatur/Sauerstoff/Gewicht (Querformat): alle gewählten Werte auf EINER Seite, je ein Band (bis zu drei)
@@ -2282,9 +2364,9 @@ function rpVitalLandscape(rep,vrep,pageNo){
   const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:12px"><div style="width:34px;height:34px;border-radius:9px;background:${acc};display:grid;place-items:center;flex:none">${rpMark(20,'#fff')}</div><div><div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1">${escapeHtml(vrep.title)} · Anhang</div><div style="font-size:12px;font-weight:600;color:${RP.muted};margin-top:3px">Detaillierter Verlauf & alle Messwerte</div></div></div><div style="text-align:right"><div style="font-size:12.5px;font-weight:800;color:${RP.ink}">${rep.period}</div><div style="font-size:11px;font-weight:600;color:${RP.muted};margin-top:2px">${parts}</div></div></div>`;
   const item=(node,txt)=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:${RP.muted}">${node}${txt}</span>`;
   const disc=c=>`<span style="width:10px;height:10px;border-radius:50%;background:${c}"></span>`;
-  const legend=`<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">${vrep.withTS?item(disc(RP.amp.g.bar),'im Zielbereich')+item(disc(RP.amp.y.bar),'etwas außerhalb')+item(disc(RP.amp.r.bar),'deutlich außerhalb'):''}${item(`<span style="width:16px;height:0;border-top:2px dashed ${RP.muted}"></span>`,'Ø Mittel')}</div>`;
+  const legend=`<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">${vrep.withAmpel?item(disc(RP.amp.g.bar),'im Zielbereich')+item(disc(RP.amp.y.bar),'etwas außerhalb')+item(disc(RP.amp.r.bar),'deutlich außerhalb'):''}${item(`<span style="width:16px;height:0;border-top:2px dashed ${RP.muted}"></span>`,'Ø Mittel')}</div>`;
   const body=`<div style="flex:1;background:${RP.surf2};border-radius:16px;padding:15px 17px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:${RP.muted};margin-bottom:10px">VERLAUF · WERT & DATUM JE MESSPUNKT</div><div style="flex:1;display:flex;align-items:stretch">${rpVitalChartDetail(vrep,1035,acc)}</div>${legend}</div>`;
-  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpVFoot('Seite '+pageNo+' · Anhang',vrep.withTS)}</div>`;
+  return `<div class="rp-page rp-page-land" style="width:1123px;min-height:794px;background:#fff;color:${RP.ink};display:flex;flex-direction:column;padding:40px 44px 32px">${header}${body}${rpVFoot('Seite '+pageNo+' · Anhang',vrep)}</div>`;
 }
 /* Alle Druckseiten in der richtigen Reihenfolge: Seite 1 · Temperatur/Sauerstoff/Gewicht (wenn an und Werte da) ·
    Anhang Blutdruck · Anhang Temperatur/Sauerstoff/Gewicht (beide nur mit „Anhangseite drucken"). */
@@ -2340,10 +2422,9 @@ function renderReport(){
   const swatch=l=>{ const on=reportState.accent===l; return `<button class="rp-swatch${on?' active':''}" data-rp="acc" data-val="${l}" title="${l}" type="button" style="--sw:${RP.acc[l]}">${on?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}</button>`; };
   const farbe=card(lbl('REPORT-FARBE')+`<div class="rp-swatches">${RP_ACC_ORDER.map(swatch).join('')}</div>`);
   const tog=(k,t,sub)=>`<div class="rp-opt"><div class="rp-opt-txt"><div class="rp-opt-t">${t}</div>${sub?`<div class="rp-opt-s">${sub}</div>`:''}</div><button class="rp-toggle${reportState[k]?' on':''}" data-rp="toggle" data-val="${k}" type="button" role="switch" aria-checked="${reportState[k]?'true':'false'}"><span class="rp-knob"></span></button></div>`;
-  // Die Zählung bleibt unabhängig von den Schaltern: Sie sagt, was es im Zeitraum gibt.
-  const vSub=vrep.temp.count+vrep.spo2.count?'Eigene Seite: '+rpParts([vrep.temp,vrep.spo2]):'Keine Werte im Zeitraum';
-  const wN=vrep.weight.count, wSub=wN?wN+(wN===1?' Messung':' Messungen')+' im Zeitraum':'Keine Werte im Zeitraum';
-  const opt=card(lbl('OPTIONEN')+tog('namen','Namensfeld zum Ausfüllen')+tog('puls','Puls einbeziehen')+tog('vital','Temperatur & Sauerstoff einbeziehen',vSub)+tog('gewicht','Gewicht einbeziehen',wSub)+tog('anhang',pg.withV?'Anhangseiten drucken':'Anhangseite drucken',pg.withV?'Detail-Diagramme im Querformat (Seite 3 und 4)':'Detail-Diagramm im Querformat (Seite 2)'));
+  // Nur eingeschaltete Werte bekommen einen Schalter. Die Zählung bleibt unabhängig davon: Sie sagt, was es im Zeitraum gibt.
+  const vTog=t=>{ const n=vrep[t].count; return tog(t,METRICS[t].name+' einbeziehen',n?n+(n===1?' Messung':' Messungen')+' im Zeitraum':'Keine Werte im Zeitraum'); };
+  const opt=card(lbl('OPTIONEN')+tog('namen','Namensfeld zum Ausfüllen')+tog('puls','Puls einbeziehen')+activeVitals().map(vTog).join('')+tog('anhang',pg.withV?'Anhangseiten drucken':'Anhangseite drucken',pg.withV?'Detail-Diagramme im Querformat (Seite 3 und 4)':'Detail-Diagramm im Querformat (Seite 2)'));
   const shot=(w,html)=>`<div class="rp-shot" data-w="${w}"><div class="rp-scaler">${html}</div></div>`;
   const preview=`<div class="rp-card rp-preview">${lbl('VORSCHAU')}${shot(794,pg.p1)}`
     +(pg.withV?`<div class="rp-anh-lbl">SEITE 2 · ${escapeHtml(vrep.title.toUpperCase())}</div>${shot(794,pg.pv)}`:'')
@@ -2364,7 +2445,7 @@ function rpScalePreview(){
 }
 /* Report öffnen: Zustand IMMER auf Standard zurücksetzen (flüchtig), dann als eigene Ebene öffnen. */
 function openReport(){
-  reportState={accent:'Kobalt',range:'30',from:null,to:null,puls:true,namen:true,anhang:false,vital:true,gewicht:true};
+  reportState=rpDefaults();
   rpLoadFont();                       // Schrift für „Als Datei teilen" vorab laden
   navPush('report',null);
 }

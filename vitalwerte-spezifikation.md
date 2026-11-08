@@ -1,7 +1,7 @@
 # Vitalwerte – Datenspezifikation
 
 Stand: 2026-11-04, ergänzt 2026-11-07 (Ziffern-Logik, Dashboard, Zielbereich, großes +), am 2026-11-08 mit dem
-fertigen Code abgeglichen (Umbau Schritte 1–10 erledigt), seit 2026-11-08 auch mit dem **Körpergewicht**. Diese Datei beschreibt **was** die App bei
+fertigen Code abgeglichen (Umbau Schritte 1–10 erledigt), seit 2026-11-08 auch mit dem **Körpergewicht** und **abwählbaren Messwerten** (Abschnitt 13). Diese Datei beschreibt **was** die App bei
 Körpertemperatur, Sauerstoffsättigung (SpO₂) und Körpergewicht rechnet, speichert und anzeigt – nicht wie es aussieht. Gleiche
 Aufteilung wie die [dashboard-spezifikation.md](dashboard-spezifikation.md):
 
@@ -122,8 +122,9 @@ Sie liefert Farbe **und** Text, weil Gelb bei der Temperatur zwei Bedeutungen ha
 
 - Je Wert eine Ampel-Leiste, darunter die Grenzen als Eingabe-Chips an den Übergängen, zusammen **neun Grenzen**
   (Sys 2, Dia 2, Temperatur 3, Sauerstoff 2). Jede Zahl gehört zum Bereich rechts davon („ab"). Hinweissatz darunter:
-  „Jede Zahl zählt schon zum Bereich rechts davon: 37,5 °C gilt als „Erhöht". Die Standardwerte sind gängige
-  Richtwerte." Eine gültige Eingabe gilt sofort überall.
+  „Jede Zahl zählt schon zum Bereich rechts davon: 130 mmHg gilt als „Erhöht". Die Standardwerte sind gängige
+  Richtwerte." Eine gültige Eingabe gilt sofort überall. Leisten ausgeblendeter Werte fallen weg (Abschnitt 13), ihre
+  Grenzen bleiben gespeichert und im Backup.
 - Temperatur-Felder als Textfeld mit `inputmode="decimal"`. Komma und Punkt zählen beide, damit das
   Komma der iPhone-Tastatur sicher ankommt. Die übrigen Felder `inputmode="numeric"`.
 - Die Reihenfolge muss stimmen, **auch beim Blutdruck**: `sysY < sysR`, `diaY < diaR`, `tempLow < tempY < tempR` und
@@ -133,8 +134,8 @@ Sie liefert Farbe **und** Text, weil Gelb bei der Temperatur zwei Bedeutungen ha
   ganze Zahl eingeben." / „Höchstens 100 %." / „Nicht übernommen: Die Zahlen müssen von links nach rechts größer
   werden." Beim **Verlassen** eines ungültigen Felds springt es auf den alten Wert zurück, dazu der Hinweis-Toast
   „Nicht übernommen, der alte Wert gilt weiter."
-- „Standardwerte wiederherstellen" setzt alle neun Grenzen zurück.
-- **Stand-Zeile** des Abschnitts im Menü: „Standardwerte", sobald eine Grenze abweicht „Eigene Werte".
+- „Standardwerte wiederherstellen" setzt die sichtbaren Grenzen zurück, die ausgeblendeter Werte bleiben unangetastet.
+- **Stand-Zeile** des Abschnitts im Menü: „Standardwerte", sobald eine sichtbare Grenze abweicht „Eigene Werte".
 
 **Noch nicht abgesichert, nicht als Tatsache darstellen:** Das sind gängige Richtwerte. Die
 Sauerstoff-Stufen stammen aus Gesundheitsratgebern. Für die Fieber-Grenzen wurde keine offizielle
@@ -230,6 +231,8 @@ selben Aufbau, Einzelheiten in [dashboard-spezifikation.md](dashboard-spezifikat
 - `app` bleibt `'blutdruck'`. Die App liest das Feld nirgends aus, eine Änderung hätte keinen Nutzen.
 - `settings.thr` enthält die neuen Grenzen mit. Die alte App kann damit umgehen, sie behält die
   zusätzlichen Schlüssel einfach.
+- `settings.hiddenVitals` sichert die Messwerte-Schalter (Abschnitt 13). `vitals` enthält **immer alle** Werte, auch
+  ausgeblendete. Für nicht erfasste Werte gibt es **keinen Platzhalter**.
 
 ### 6.2 Zusammenführen (`mergeEntriesFromData`)
 - Führt `entries` und `vitals` zusammen. Die Statistik „X neu, Y aktualisiert" zählt beide.
@@ -265,7 +268,9 @@ Daneben steht im Backup-Abschnitt der Hinweis, dass Backups erst an einem **zwei
 sicher vor Verlust sind.
 
 ### 6.4 Löschen
-„Alle Daten löschen" löscht auch `vitals`, die Meldungen zählen alle Werte zusammen.
+„Alle Daten löschen" löscht auch `vitals` (auch ausgeblendete Werte), die Meldungen zählen alle Werte zusammen. Die
+Rückfrage markiert Ausgeblendete: „Alle 54 Messungen werden dauerhaft gelöscht: 42 Blutdruck, 7 Temperatur und 5 Gewicht
+(ausgeblendet). Das lässt sich nicht rückgängig machen." Die Messwerte-Schalter bleiben stehen.
 
 ---
 
@@ -275,6 +280,9 @@ sicher vor Verlust sind.
 - Eine Zeile je Datensatz, nach Zeit sortiert. Spalten anderer Werte bleiben leer. Es wird nichts anhand gleicher
   Uhrzeiten zusammengelegt.
 - Temperatur und Gewicht mit Dezimalkomma und immer einer Nachkommastelle (`36,8`, `37,0`, `82,5`) für das deutsche Excel.
+- **Ausgeblendete Werte** fehlen samt Spalte, die übrige Reihenfolge bleibt. Die Zeile unter dem Knopf (`#csvNote`) nennt nur
+  Exportiertes, gibt es Ausgeblendete, folgt „Nicht in der CSV, weil ausgeblendet: 5 Gewicht". Gibt es nur ausgeblendete Werte,
+  meldet der Knopf „Noch keine Werte zum Exportieren".
 
 ---
 
@@ -283,10 +291,9 @@ sicher vor Verlust sind.
 Umgesetzt 2026-11-08, Einzelheiten in der [arzt-report-spezifikation.md](arzt-report-spezifikation.md) (Abschnitte 9
 und 10). Kurz:
 
-- **Schalter „Temperatur & Sauerstoff einbeziehen":** Standard **an**, flüchtig wie der übrige `reportState`. Die
-  Unterzeile zählt die Werte im Zeitraum; ohne Werte entfällt die Seite („Keine Werte im Zeitraum").
-- **Schalter „Gewicht einbeziehen":** eigener Schalter, Standard **an**. Das Gewicht steht auf derselben Seite wie
-  Temperatur und Sauerstoff. Ohne Gewicht im Zeitraum sieht der Bericht aus wie bisher.
+- **Je Wert ein Schalter** „Temperatur einbeziehen", „Sauerstoff einbeziehen", „Gewicht einbeziehen": Standard **an**,
+  flüchtig wie der übrige `reportState`, nur sichtbar, wenn der Wert unter Messwerte an ist. Die Unterzeile zählt die Werte im
+  Zeitraum; ohne Werte entfällt die Seite („Keine Werte im Zeitraum"). Alle drei stehen auf derselben Seite.
 - **Eigene A4-Seite** (Seite 2): je Wert Ø mit Ampel-Wort, Tiefst–Höchst, Anzahl und Verlauf, dazu die Werteliste und
   die angewendeten Grenzen. Fehlt ein Wert im Zeitraum, steht dort „Keine Werte im Zeitraum." bzw. „—" in der Tabelle.
 - **Anhang im Querformat** für Temperatur & Sauerstoff (beide auf einer Seite), zusammen mit dem Blutdruck-Anhang über
@@ -315,6 +322,11 @@ Schlüssel nicht und übernimmt ihn einfach nicht.
 Jede Wahlzeile zeigt ein kleines Bild des Bildschirms, Name, Satz und rechts den Häkchen-Kreis. Das große + ruft
 `openPlus()` auf, das nach `plusModeNow()` verzweigt. Die Anleitung erklärt die drei Wege im Thema „Plus-Button".
 
+**Nur eingeschaltete Werte** (Abschnitt 13) stehen im Blatt, im Umschalter und im Durchgang C. Sind nur Blutdruck und Puls an,
+startet das + sofort die Eingabe: A ohne Blatt, B ohne Umschalter (Modus `bp`), C bleibt Modus `alle` (sonst würde der Puls zur
+Pflicht). Die Wahl unter Menü → Anzeige ist dann ausgegraut mit „Nur Blutdruck und Puls sind eingeschaltet. Das + startet direkt
+die Eingabe."; `settings.plusMode` bleibt gespeichert und gilt wieder, sobald ein weiterer Wert an ist.
+
 **Das Datenmodell bleibt bei allen gleich.** Bearbeiten öffnet immer nur die Felder des einen Datensatzes. Bei C:
 Jeder ausgefüllte Wert wird ein eigener Datensatz mit gleichem `ts`, leere Felder erzeugen keinen Datensatz, und die
 Notiz wird in alle in diesem Durchgang angelegten Datensätze kopiert. Systolisch und Diastolisch gehören zusammen;
@@ -331,15 +343,17 @@ Checkliste für den Umbau, **alle Punkte umgesetzt**. Bleibt als Nachschlage-Lis
 | Stelle | Was sich geändert hat |
 |---|---|
 | `openDB`, `initStorage` | Neuer Store `vitals` (`DB_VER` 2) und Laden von `vitals` |
-| `renderDashboard` | Neu aufgebaut, bricht nur ab, wenn **gar keine** Werte da sind (`totalCount`) |
+| `renderDashboard` | Neu aufgebaut, zeigt die Begrüßung, wenn **keine sichtbaren** Werte da sind (Blutdruck oder eingeschaltete Werte) |
 | `meanKey`, `trendChip` | Temperatur über `meanMetric`/`fmtMetric` mit Nachkommastelle; `trendChip` entfiel mit dem Trend |
 | `animateDashboard` | Hochzählen auch für die Temperatur der letzten Messung (Komma über `fmtMetric`) |
 | `startCapture`, `capUpdate`, `capPressDigit`, `capSkip`, `capSave`, `capPressBack` | Feldliste je Art über `CAP_MODES` |
 | `renderTable`, `renderChart` | Umschalter (`viewMetric`), `getFilteredVitals`, `renderMetricChart`, neue Leerzustände |
 | `renderDetail`, `#detEdit`, `#detDelete` | Suchen über `findRecord` in beiden Listen, `renderVitalDetail` |
-| `exportCSV`, `exportJSON`, `shareBackup` | „Noch keine Werte" nur, wenn beide Listen leer sind (`totalCount`) |
-| `clearAllData` | Zählt und löscht beide Listen |
-| Backup-Erinnerung, Zähler `#csvNote` | Zählen alle Werte (`countParts`) |
+| `exportJSON`, `shareBackup` | „Noch keine Werte" nur, wenn beide Listen leer sind (`totalCount`) |
+| `exportCSV` | Nur Blutdruck und eingeschaltete Werte (`activeVitals`, `visibleVitals`) |
+| `clearAllData` | Zählt und löscht beide Listen, `countParts('all')` |
+| Backup-Erinnerung | Zählt alle Werte (`totalCount`) |
+| Zähler `#csvNote` | `countParts('shown')`, darunter `countParts('hidden')` |
 | `applyBackupSettings` | Grenzen zusammenführen statt ersetzen (siehe 6.2) |
 
 ---
@@ -363,3 +377,28 @@ Fahrenheit · gemeinsames Diagramm aller Werte · beim Gewicht: Zielgewicht, BMI
 | Diagramm: Zeitachse, Punkte, Ø-Linie, Höhen-Achse | Umschalter Blutdruck · Temperatur · Sauerstoff, Sauerstoff-Symbol „Bläschen", App-Icon **7a** |
 
 Offen ist nur noch, wie einiges auf echten Geräten wirkt (iPhone und Android, siehe Gerätetests in der `CLAUDE.md`).
+
+---
+
+## 13. Messwerte ein- und ausschalten (seit 2026-11-08)
+
+Blutdruck und Puls sind immer an, ohne Schalter. Temperatur, Sauerstoff und Gewicht sind einzeln abwählbar, Standard alle an.
+
+- **Speicher:** `settings.hiddenVitals`, die Liste der **ausgeblendeten** Arten (Standard `[]`). Ein künftiger neuer Wert ist dadurch
+  von selbst an. Bisherige Nutzer merken nichts, der Standard wird beim Laden eingesetzt. Abfrage über `vitalOn(type)`, `activeVitals()`,
+  `visibleVitals()`, `metricOrder()`, `capFieldsOf(mode)`.
+- **Ausschalten heißt nur ausblenden:** Nichts wird gelöscht, keine Rückfrage, wirkt sofort beim Antippen. `saveSettings()` (Auto-Backup
+  ja), kein `markDirty`. Beim Wiedereinschalten sind die alten Werte wieder da.
+- **Ausgeblendet in:** Erfassen, Dashboard, Verlauf, Diagramm, Zielbereich, Arzt-Report, CSV. **Nicht** in: Backup, Backup-Erinnerung,
+  Stand-Zeile „Daten", „Alle Daten löschen".
+- **Menü-Abschnitt „Messwerte"** zwischen Daten und Zielbereich: gesperrte Zeile „Blutdruck und Puls / Immer dabei", je Wert Symbol,
+  Zählung („12 Werte", „5 Werte ausgeblendet", „Noch keine Werte") und Schalter. Stand-Zeile „Alle Werte an", „Ohne Gewicht", „Ohne
+  Temperatur und Gewicht", „Nur Blutdruck und Puls".
+- **Verlauf, Diagramm, Variante B:** Umschalter und Wischen nur über eingeschaltete Werte, Breite der Markierung über `--n`. Nur Blutdruck
+  und Puls an: Umschalter und Wischen entfallen, kein Federn. War ein ausgeschalteter Wert gewählt, springt die Ansicht auf Blutdruck.
+- **Backup:** Die Schalter sind eine Einstellung im Backup. Bei „Werte und Einstellungen übernehmen" gelten sie; fehlt die Angabe,
+  bleiben die aktuellen Schalter. `mergeEntriesFromData` nimmt alle Werte auf, egal wie die Schalter stehen.
+- **Zusatzmeldung beim Wiederherstellen und Verknüpfen:** „Ausgeblendet: 3 Temperatur · 5 Gewicht. Einschalten im Menü." Gezählt
+  werden alle Werte dieser Art **aus der Datei** (neu und aktualisiert). Sie erscheint erst **nach** der Wahl im Einstellungen-Fenster,
+  denn dort können sich die Schalter noch ändern; ohne Einstellungen in der Datei kommt sie sofort mit in die Meldung.
+- **Anleitung:** bleibt für alle gleich und passt sich nicht an die Schalter an (Thema „Messwerte ein- und ausschalten").

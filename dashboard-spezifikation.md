@@ -1,6 +1,6 @@
 # Dashboard – Datenspezifikation
 
-Stand: 2026-07-02, neu gefasst 2026-11-07 (Dashboard „Letzte Messung + 7 Tage“ mit Temperatur und Sauerstoff), ergänzt 2026-11-08 ums Gewicht. Diese Datei beschreibt **was** das Dashboard rechnet und anzeigt –
+Stand: 2026-07-02, neu gefasst 2026-11-07 (Dashboard „Letzte Messung + 7 Tage“ mit Temperatur und Sauerstoff), ergänzt 2026-11-08 ums Gewicht und um abwählbare Messwerte. Diese Datei beschreibt **was** das Dashboard rechnet und anzeigt –
 nicht wie es aussieht.
 
 - **Fix (Logik/Daten):** Kennzahlen, Berechnung, Zeitfenster, Ampel-Regeln, Leerzustände.
@@ -33,10 +33,17 @@ Bereichen: oben „Letzte Messung", darunter „Letzte 7 Tage". Überschrift „
 - **Zweck:** „Wie stehe ich gerade?"
 - **Karten:** Blutdruck + Puls (eine Karte, eine Messung) · Temperatur · Sauerstoff (nebeneinander) · darunter Gewicht
   (eine Karte über die ganze Breite, drei nebeneinander wären auf dem Handy zu eng für die großen Zahlen).
+- **Anordnung nach eingeschalteten Werten** (Menü → Messwerte, Reihenfolge immer Temperatur, Sauerstoff, Gewicht):
+  - Alle drei an: wie oben.
+  - Zwei an, in jeder Paarung: beide nebeneinander (`.dlm-row`), Gewicht dann als normale schmale Karte, oben ausgerichtet, damit die
+    Zahlen auf gleicher Höhe stehen (unter der Zahl bleibt frei, weil Gewicht kein Ampel-Wort hat).
+  - Nur Temperatur oder nur Sauerstoff: breite Karte, Name und Zeit links, rechts die Zahl, darunter rechtsbündig das Ampel-Wort (`.dlm-side`).
+  - Nur Gewicht: breit wie oben. Keiner: nur Blutdruck und Puls.
 - **Inhalt:** Zahl mit Einheit in Ampelfarbe, Ampel-Punkt und **Ampel-Wort** (Blutdruck: `category()`, Temperatur und
   Sauerstoff: `catMetric`). Puls in Puls-Farbe ohne Ampel, Gewicht in normaler Schriftfarbe ohne Ampel. Zeitpunkt **relativ** („vor 2 Std.", `relTime`).
 - **Antippen:** öffnet das Detail dieser Messung.
-- **Leerzustand:** Gibt es von einem Wert noch nichts, steht in seiner Karte „Noch kein Wert".
+- **Leerzustand:** Gibt es von einem Wert noch nichts, steht in seiner Karte „Noch kein Wert". Die Begrüßung „Noch keine Messung
+  erfasst." erscheint auch, wenn es nur ausgeblendete Werte und keinen Blutdruck gibt.
 
 ### 1.2 Ø Blutdruck (7 Tage) mit Ø Puls
 - **Berechnung:** Mittelwert von `sys`, `dia` und `pulse` im 7-Tage-Fenster (168 h, rollierend, fest).
@@ -51,6 +58,8 @@ Bereichen: oben „Letzte Messung", darunter „Letzte 7 Tage". Überschrift „
 ### 1.4 Ø Gewicht (7 Tage)
 - Wie 1.3, eigene Karte, auf eine Nachkommastelle, **ohne Ampel** (keine Farbe, kein Wort, kein Punkt). Erst ab 3 Messungen.
 - **Kein Trend**, kein Zielgewicht, kein BMI.
+
+In „Letzte 7 Tage" fallen die Karten ausgeschalteter Werte weg.
 
 ### 1.5 Entfallen
 - **Ampel-Verteilung 30 Tage** (Ring, Prozente, Anzahl) samt Ring-Animation entfällt ersatzlos. Den Überblick

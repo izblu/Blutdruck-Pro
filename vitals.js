@@ -23,6 +23,12 @@ const METRICS={
   weight:{key:'weight',name:'Gewicht',long:'Körpergewicht',unit:'kg',dec:1,plaus:[30,250],seg:'GEW',icon:IC_PATH_WEIGHT}
 };
 const VITAL_TYPES=['temp','spo2','weight'];
+/* ---------- Welche Messwerte sind eingeschaltet? (Menü → Messwerte) ----------
+   Blutdruck und Puls sind immer dabei. settings.hiddenVitals ist die Liste der AUSGEBLENDETEN Arten, ein künftiger neuer
+   Wert ist dadurch von selbst an. Ausblenden löscht nichts: `vitals`, Backup und die Zählungen dafür bleiben vollständig. */
+const vitalOn=type=>!settings.hiddenVitals.includes(type);
+const activeVitals=()=>VITAL_TYPES.filter(vitalOn);
+const visibleVitals=()=>vitals.filter(v=>vitalOn(v.type));
 /* Hat dieser Wert eine Ampel? Das Gewicht nicht (wie der Puls): nur die Zahl, kein Punkt, kein Wort, kein Zielbereich. */
 const hasAmpel=type=>type!=='weight';
 /* Standard-Grenzen (gängige Richtwerte, keine Leitlinie – siehe Spezifikation Abschnitt 2). */
@@ -163,11 +169,16 @@ function normVital(x){
   return {id:x.id||uid(),ts:t.toISOString(),type:x.type,value:METRICS[x.type].dec?Math.round(value*10)/10:Math.round(value),note:x.note?String(x.note):''};
 }
 const totalCount=()=>entries.length+vitals.length;
-/* „42 Blutdruck · 7 Temperatur · 7 Sauerstoff · 5 Gewicht" (Arten ohne Werte entfallen). */
-function countParts(){
+/* „42 Blutdruck · 7 Temperatur · 7 Sauerstoff · 5 Gewicht" (Arten ohne Werte entfallen).
+   mode: 'shown' nur Blutdruck und Eingeschaltete · 'hidden' nur Ausgeblendete · 'all' alles, Ausgeblendete mit Vermerk. */
+function countParts(mode){
   const p=[];
-  if(entries.length) p.push(entries.length+' Blutdruck');
-  VITAL_TYPES.forEach(type=>{ const n=vitalsOf(type).length; if(n) p.push(n+' '+METRICS[type].name); });
+  if(entries.length&&mode!=='hidden') p.push(entries.length+' Blutdruck');
+  VITAL_TYPES.forEach(type=>{
+    const n=vitalsOf(type).length, on=vitalOn(type);
+    if(!n||(mode==='shown'&&!on)||(mode==='hidden'&&on)) return;
+    p.push(n+' '+METRICS[type].name+(mode==='all'&&!on?' (ausgeblendet)':''));
+  });
   return p;
 }
 

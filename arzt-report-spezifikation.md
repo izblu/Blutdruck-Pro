@@ -140,14 +140,16 @@ Eigene A4-Seite (Hochformat) **nach Seite 1** und **vor** dem Querformat-Anhang.
 von Seite 1 (gleiche helle Palette `RP`, gleiche Kacheln, gleiche Fußzeile). Funktionen: `reportVitals`, `rpMetricChart`,
 `rpVitalPage`, `rpPages` in [app.js](app.js).
 
-- **Schalter** im Report-Menü: „Temperatur & Sauerstoff einbeziehen", Standard **an** (wie alle Report-Optionen flüchtig,
-  nicht in `settings`/Backup). Unterzeile zeigt die Anzahl je Wert im Zeitraum („Eigene Seite: 10 Temperatur · 9 Sauerstoff").
-- **Schalter „Gewicht einbeziehen"** (eigener Schalter, Standard **an**, flüchtig). Unterzeile: Anzahl im Zeitraum bzw. „Keine
-  Werte im Zeitraum". **Die Zählung in beiden Unterzeilen ist unabhängig von den Schaltern**, die Seiten richten sich danach.
-- **Titel je nach Inhalt:** „Temperatur, Sauerstoff & Gewicht" · „Temperatur & Sauerstoff" · „Gewicht". Ohne Gewicht im Zeitraum
-  (oder mit Schalter aus) sieht der Bericht aus wie vorher; ohne Temperatur und Sauerstoff stehen nur Kachel und Spalte fürs Gewicht da.
-- **Keine Werte im Zeitraum:** Die Seite entfällt, auch wenn der Schalter an ist; Unterzeile „Keine Werte im Zeitraum".
-  Fehlt nur einer der beiden Werte, zeigt seine Kachel „Keine Werte im Zeitraum."
+- **Schalter** im Report-Menü, je Wert einer (seit 2026-11-08): „Temperatur einbeziehen", „Sauerstoff einbeziehen", „Gewicht
+  einbeziehen", Standard **an** (wie alle Report-Optionen flüchtig, nicht in `settings`/Backup). Reihenfolge: Namensfeld, Puls,
+  Temperatur, Sauerstoff, Gewicht, Anhang. Ein Schalter erscheint nur, wenn der Wert unter Menü → Messwerte an ist. Unterzeile:
+  „N Messung(en) im Zeitraum" bzw. „Keine Werte im Zeitraum". **Die Zählung ist unabhängig von den Schaltern**, die Seiten richten
+  sich danach.
+- **Titel aus dem Inhalt:** „Temperatur" · „Sauerstoff" · „Gewicht" · „Temperatur & Sauerstoff" · „Temperatur & Gewicht" ·
+  „Sauerstoff & Gewicht" · „Temperatur, Sauerstoff & Gewicht".
+- **Keine Werte im Zeitraum:** Die Seite entfällt, auch wenn die Schalter an sind; Unterzeile „Keine Werte im Zeitraum". Sind
+  Temperatur und Sauerstoff beide gewählt und fehlt nur einer im Zeitraum, zeigt seine Kachel „Keine Werte im Zeitraum."; ein unter
+  Messwerte ausgeschalteter Wert erscheint auch so nie. Gewicht ohne Werte entfällt. Bei nur Blutdruck und Puls entfällt die zweite Seite.
 - **Zeitraum:** derselbe wie Seite 1 (eigener Von–Bis-Wähler des Reports).
 - **Je Wert eine Kachel:**
   - **Ø** über alle Messungen im Zeitraum, gerundet wie in der App (`meanMetric`: Temperatur 0,1 °C, Sauerstoff ganzzahlig),
@@ -161,7 +163,7 @@ von Seite 1 (gleiche helle Palette `RP`, gleiche Kacheln, gleiche Fußzeile). Fu
   mit **gleichem Zeitpunkt** (Durchgang „Alles nacheinander") stehen in **einer** Zeile, unterschiedliche Notizen werden mit
   „ · " verbunden. Wert mit Ampel-Punkt in Ampelfarbe (Gewicht ohne Punkt); fehlender Wert „—".
 - **Fußzeile:** angewendete Grenzwerte aus `settings.thr` (Temperatur normal ab `tempLow`, erhöht ab `tempY`, Fieber ab `tempR`;
-  Sauerstoff im Ziel ab `spo2G`, niedrig ab `spo2Y`, darunter zu niedrig; **nur, wenn Temperatur/Sauerstoff drin sind**) und derselbe
+  Sauerstoff im Ziel ab `spo2G`, niedrig ab `spo2Y`, darunter zu niedrig; **nur für Werte, die im Bericht stehen**) und derselbe
   Haftungshinweis wie Seite 1.
   Die Standard-Fiebergrenzen sind gängige Richtwerte, **nicht gegen eine Leitlinie bestätigt** (siehe
   `vitalwerte-spezifikation.md`).

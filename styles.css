@@ -315,6 +315,19 @@ dialog::backdrop{background:var(--dlg-backdrop,rgba(15,23,42,.55))}   /* Rückfa
 .pp-opt[aria-pressed="true"] .pp-ck{border:0;background:var(--accent)}
 .pp-opt[aria-pressed="true"] .pp-ck svg{opacity:1}
 
+.pp-opt:disabled{opacity:.5;cursor:default}
+#plusPickNote{line-height:1.4}
+
+/* Messwerte: je Wert eine Zeile mit Symbol, Zählung und Schalter (Aussehen wie im Arzt-Report) */
+.mv-card{padding:2px 12px}
+.mv-row{display:flex;align-items:center;gap:11px;min-height:62px}
+.mv-row+.mv-row{border-top:1px solid var(--line)}
+.mv-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mv-t{font-size:13.5px;font-weight:800}
+.mv-s{font-size:12px;font-weight:600;color:var(--muted)}
+.mv-row .rp-toggle::after{content:"";position:absolute;inset:-10px -6px}   /* Tippfläche 52 × 44 px, sichtbar bleiben 40 × 24 */
+.rp-toggle:disabled{opacity:.5;cursor:default}
+
 /* Daten: Export-Zeilen + Lösch-Knopf */
 .m-row{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;box-sizing:border-box;text-align:left;background:var(--btn);border:1px solid var(--btn-bd);border-radius:11px;padding:0 12px;color:var(--ink);font:inherit;cursor:pointer}
 .m-row-ic{color:var(--accent);display:grid;place-items:center;flex:0 0 auto}
@@ -331,7 +344,7 @@ dialog::backdrop{background:var(--dlg-backdrop,rgba(15,23,42,.55))}   /* Rückfa
 /* Fußleiste */
 .menu-close{min-height:46px;border-radius:12px;padding:0 20px;font:inherit;font-size:15.5px;font-weight:700}
 
-/* ==== Anleitung: 10 Themen zum Aufklappen (Entwurf Anleitung.dc.html) ==== */
+/* ==== Anleitung: 11 Themen zum Aufklappen (Entwurf Anleitung.dc.html) ==== */
 #helpDlg{height:82vh}
 #helpDlg .dlg-head{padding:2px 18px 4px;font-size:17.5px;font-weight:800;letter-spacing:-.01em}
 #helpBody{padding:12px 18px 16px;position:relative;scrollbar-width:none}
@@ -488,6 +501,8 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 .dlm-none{opacity:.75}
 /* Gewicht: eine Karte über die ganze Breite, Name links, Zahl rechts (keine Ampel darunter) */
 .dlm-wide{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+/* Temperatur oder Sauerstoff allein: breite Karte, rechts die Zahl, darunter rechtsbündig das Ampel-Wort */
+.dlm-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 /* Letzte 7 Tage */
 .dst{display:flex;flex-direction:column;padding:0}
 .dst-top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px 12px}
@@ -605,7 +620,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .cap-seg.compact .cap-tile-val{font-size:clamp(12.5px,4vw,17px);letter-spacing:-.02em}
 /* Variante B: Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht */
 .cap-switch{position:relative;flex:none;display:flex;gap:4px;margin:8px 16px 0;padding:4px;border-radius:999px;background:var(--surf2)}
-.cap-switch-ink{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 20px)/4);border-radius:999px;background:var(--accent);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.cap-switch-ink{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px - (var(--n,4) - 1)*4px)/var(--n,4));border-radius:999px;background:var(--accent);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
 .cap-switch button{position:relative;flex:1 1 0;min-width:0;min-height:44px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:clamp(11px,3.3vw,13px);font-weight:800;white-space:nowrap;transition:color .2s ease}
 .cap-switch button.active{color:var(--accent-ink)}
 @media (prefers-reduced-motion:reduce){.cap-switch-ink,.metric-seg-ink{transition:none}}
@@ -732,7 +747,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 
 /* ---- Umschalter Blutdruck · Temperatur · Sauerstoff · Gewicht (Verlauf + Diagramm) ---- */
 .metric-seg{position:relative;flex:none;display:flex;gap:4px;margin:2px 16px 6px;padding:3px;border-radius:999px;background:var(--surf2);border:1px solid var(--line)}
-.metric-seg-ink{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 18px)/4);border-radius:999px;background:var(--surf);box-shadow:0 1px 3px rgba(20,30,50,.14);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.metric-seg-ink{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px - (var(--n,4) - 1)*4px)/var(--n,4));border-radius:999px;background:var(--surf);box-shadow:0 1px 3px rgba(20,30,50,.14);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
 .metric-seg button{position:relative;flex:1 1 0;min-width:0;min-height:40px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:clamp(11px,3.3vw,13px);font-weight:800;white-space:nowrap;transition:color .2s ease}
 .metric-seg button.active{color:var(--accent)}
 /* Wischen (Erfassen Variante B, Verlauf, Diagramm; app.js, swipePager): .swipe-stage gleitet, die Kopie der alten Seite

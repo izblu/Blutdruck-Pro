@@ -303,7 +303,7 @@
 </div>
 
 <!-- Menü (Bottom-Sheet, Aussehen A „Verfeinert"): jeder Abschnitt eine Karte mit Stand-Zeile,
-     Reihenfolge Backup · Daten · Zielbereich · Anzeige · Anleitung. Immer nur ein Abschnitt offen. -->
+     Reihenfolge Backup · Daten · Messwerte · Zielbereich · Anzeige · Anleitung. Immer nur ein Abschnitt offen. -->
 <dialog id="menuDlg">
   <div class="dlg-grab" aria-hidden="true"></div>
   <div class="dlg-head">Menü</div>
@@ -395,7 +395,22 @@
     </div>
     </div>
 
-    <!-- ===== Zielbereich (eigener Abschnitt): Ampel-Leisten mit 9 Grenzen, gebaut von renderThrBars() ===== -->
+    <!-- ===== Messwerte: Temperatur, Sauerstoff und Gewicht ein- und ausschalten (Zeilen baut renderMetricRows) ===== -->
+    <div class="acc-sec" data-sec="metrics">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="accMetrics">
+      <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 6h9M11 12h9M11 18h9"/><path d="M3.5 6l1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5"/></svg></span>
+      <span class="acc-txt"><span class="acc-t">Messwerte</span><span class="acc-s" id="sumMetrics"></span></span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="acc-body" id="accMetrics">
+      <div class="grp-card mv-card" id="mvRows"></div>
+      <p class="m-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/></svg>
+        <span>Ausgeschaltete Werte bleiben gespeichert und im Backup. Sie werden nur nicht mehr angezeigt.</span></p>
+    </div>
+    </div>
+
+    <!-- ===== Zielbereich (eigener Abschnitt): Ampel-Leisten der eingeschalteten Werte, gebaut von renderThrBars() ===== -->
     <div class="acc-sec" data-sec="target">
     <button class="acc-head" type="button" aria-expanded="false" aria-controls="accTarget">
       <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
@@ -405,7 +420,7 @@
     <div class="acc-body" id="accTarget">
       <div class="grp-card thr-card">
         <div class="thr-rows" id="thrBars"></div>
-        <p class="thr-note">Jede Zahl zählt schon zum Bereich rechts davon: 37,5 °C gilt als „Erhöht“. Die Standardwerte sind gängige Richtwerte.</p>
+        <p class="thr-note">Jede Zahl zählt schon zum Bereich rechts davon: 130 mmHg gilt als „Erhöht“. Die Standardwerte sind gängige Richtwerte.</p>
         <button class="btn-text thr-reset" id="thrReset" type="button">Standardwerte wiederherstellen</button>
       </div>
     </div>
@@ -433,6 +448,7 @@
       </div>
       <div class="mblk">
         <div class="mblk-t" id="plusPickT">Neue Messung (Plus-Button)</div>
+        <small class="reason" id="plusPickNote" hidden>Nur Blutdruck und Puls sind eingeschaltet. Das + startet direkt die Eingabe.</small>
         <div class="plus-pick" id="plusPick" role="group" aria-labelledby="plusPickT">
           <button type="button" class="pp-opt" data-plus="c" aria-pressed="false">
             <svg class="pp-mini" viewBox="0 0 34 46" aria-hidden="true">
@@ -477,7 +493,7 @@
     <!-- ===== Anleitung (eigene Karte, öffnet das Hilfe-Fenster) ===== -->
     <button class="acc-head acc-link" id="mHelp" type="button">
       <span class="acc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.5 1.4c0 1.6-2.2 2-2.4 3.1"/><path d="M12 17h.01"/></svg></span>
-      <span class="acc-txt"><span class="acc-t">Anleitung</span><span class="acc-s">10 Themen</span></span>
+      <span class="acc-txt"><span class="acc-t">Anleitung</span><span class="acc-s">11 Themen</span></span>
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
     </button>
     <!-- App installieren: nur im Handy-Browser sichtbar (initInstall), öffnet den Installations-Assistenten -->
@@ -492,7 +508,7 @@
   <div class="dlg-actions menu-actions"><button class="btn-fill menu-close" id="menuClose" type="button">Menü schließen</button></div>
 </dialog>
 
-<!-- Anleitung: 10 Themen zum Aufklappen (immer nur eins offen, das geöffnete rutscht nach oben) -->
+<!-- Anleitung: 11 Themen zum Aufklappen (immer nur eins offen, das geöffnete rutscht nach oben) -->
 <dialog id="helpDlg">
   <div class="dlg-grab" aria-hidden="true"></div>
   <div class="dlg-head">So funktioniert's</div>
@@ -522,8 +538,21 @@
       <div class="hlp-body" id="hlp2" hidden>
         <p>Was das große + macht, legst du unter Menü → „Anzeige“ → „Neue Messung (Plus-Button)“ fest.</p>
         <p class="hlp-pt">„Erst wählen“ fragt zuerst, was du messen möchtest.</p>
-        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck. Zu Temperatur, Sauerstoff oder Gewicht wechselst du oben oder durch Wischen nach links und rechts.</p>
-        <p class="hlp-pt">„Alles nacheinander“ (Standard) führt dich durch alle Werte; was du nicht gemessen hast, überspringst du. Eine Notiz gilt dann für alle Werte dieses Durchgangs.</p>
+        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck. Zu den anderen eingeschalteten Werten wechselst du oben oder durch Wischen nach links und rechts.</p>
+        <p class="hlp-pt">„Alles nacheinander“ (Standard) führt dich durch alle eingeschalteten Werte; was du nicht gemessen hast, überspringst du. Eine Notiz gilt dann für alle Werte dieses Durchgangs.</p>
+        <p>Sind nur Blutdruck und Puls eingeschaltet, startet das + direkt die Eingabe.</p>
+      </div>
+    </div>
+    <div class="hlp">
+      <button class="hlp-head" type="button" aria-expanded="false" aria-controls="hlp11">
+        <span class="hlp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 6h9M11 12h9M11 18h9"/><path d="M3.5 6l1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5"/></svg></span>
+        <span class="hlp-t">Messwerte ein- und ausschalten</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="hlp-body" id="hlp11" hidden>
+        <p>Blutdruck und Puls sind immer dabei. Temperatur, Sauerstoff und Gewicht schaltest du unter Menü → „Messwerte“ einzeln ein oder aus.</p>
+        <p>Ein ausgeschalteter Wert erscheint nirgends mehr: nicht beim Eintragen, nicht im Dashboard, in Verlauf und Diagramm, nicht im Arzt-Report und nicht in der CSV-Datei.</p>
+        <p>Gelöscht wird dabei nichts. Deine bisherigen Werte bleiben gespeichert und im Backup. Sie sind wieder da, sobald du den Wert einschaltest.</p>
       </div>
     </div>
     <div class="hlp">
@@ -534,7 +563,7 @@
       </button>
       <div class="hlp-body" id="hlp3" hidden>
         <p>Oben steht deine letzte Messung mit Ampel-Farbe und Ampel-Wort (beim Gewicht nur die Zahl).</p>
-        <p>Darunter siehst du für Blutdruck, Puls, Temperatur, Sauerstoff und Gewicht den Durchschnitt der letzten 7 Tage, ebenfalls mit Ampel-Farbe (bei Puls und Gewicht ohne). Einen Durchschnitt gibt es erst ab 3 Messungen.</p>
+        <p>Darunter siehst du für Blutdruck, Puls und deine eingeschalteten Werte den Durchschnitt der letzten 7 Tage, ebenfalls mit Ampel-Farbe (bei Puls und Gewicht ohne). Einen Durchschnitt gibt es erst ab 3 Messungen.</p>
         <p>Wie sich deine Werte über die Zeit entwickeln, zeigt der Tab „Diagramm“.</p>
       </div>
     </div>
@@ -559,7 +588,7 @@
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="hlp-body" id="hlp5" hidden>
-        <p>Blutdruck, Temperatur, Sauerstoff oder Gewicht wählst du oben oder durch Wischen nach links und rechts. Unten stellst du den Zeitraum ein: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
+        <p>Den Wert wählst du oben oder durch Wischen nach links und rechts. Unten stellst du den Zeitraum ein: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
         <p class="hlp-pt">Verlauf: alle Messungen, neueste zuerst. Tippe eine an, um sie anzusehen, zu bearbeiten oder zu löschen.</p>
         <p class="hlp-pt">Diagramm: deine Werte über die Zeit. Die Punkte haben die Ampel-Farbe (beim Gewicht sind sie einfarbig), die gestrichelte Linie ist der Durchschnitt. Beim Blutdruck schaltest du zwischen Sys, Dia und Beide um und blendest den Puls ein.</p>
       </div>
@@ -571,7 +600,7 @@
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="hlp-body" id="hlp6" hidden>
-        <p>Deine Werte liegen nur in dieser App auf diesem Handy. Ein Backup ist eine Datei mit allen Werten und Einstellungen.</p>
+        <p>Deine Werte liegen nur in dieser App auf diesem Handy. Ein Backup ist eine Datei mit allen Werten, auch ausgeblendeten, und Einstellungen.</p>
         <p class="hlp-pt">„Speichern“ legt die Datei auf diesem Handy ab.</p>
         <p class="hlp-pt">Das automatische Backup schreibt jede Änderung von selbst in eine Datei. Auch sie liegt auf diesem Handy. Es gibt das nur in Chrome und Edge (auch auf Android), nicht auf dem iPhone.</p>
         <div class="hlp-box hlp-safe">
@@ -593,7 +622,7 @@
       </button>
       <div class="hlp-body" id="hlp7" hidden>
         <p>„Wiederherstellen“ liest eine Backup-Datei ein und führt sie mit deinen Werten zusammen. Dabei geht nichts verloren.</p>
-        <p>Stecken in der Datei auch Einstellungen (Zielbereich, Design und mehr), fragt die App, ob du sie übernehmen willst.</p>
+        <p>Stecken in der Datei auch Einstellungen (Zielbereich, Design, eingeschaltete Messwerte und mehr), fragt die App, ob du sie übernehmen willst.</p>
         <p>Neues Handy: App installieren, dann Menü → „Backup“ → „Wiederherstellen“ und die geteilte Datei auswählen.</p>
       </div>
     </div>
@@ -604,9 +633,9 @@
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="hlp-body" id="hlp8" hidden>
-        <p class="hlp-pt">„Als CSV exportieren“ macht eine Tabelle für Excel.</p>
-        <p class="hlp-pt">„Arzt-Report“ bereitet deine Werte zum Drucken oder als PDF auf.</p>
-        <p class="hlp-pt">„Alle Daten löschen“ löscht Blutdruck, Temperatur, Sauerstoff und Gewicht. Vorher fragt die App nach. Eine Backup-Datei bleibt erhalten.</p>
+        <p class="hlp-pt">„Als CSV exportieren“ macht eine Tabelle für Excel mit deinen eingeschalteten Werten.</p>
+        <p class="hlp-pt">„Arzt-Report“ bereitet deine eingeschalteten Werte zum Drucken oder als PDF auf.</p>
+        <p class="hlp-pt">„Alle Daten löschen“ löscht alle Werte, auch ausgeblendete. Vorher fragt die App nach. Eine Backup-Datei bleibt erhalten.</p>
         <p>Darunter steht, wie viel Speicher belegt ist.</p>
       </div>
     </div>
@@ -640,7 +669,7 @@
 <dialog id="restoreDlg">
   <div class="dlg-head">Backup wiederherstellen</div>
   <div class="dlg-body">
-    <p class="help-p">Dieses Backup enthält auch deine App-Einstellungen (Schwellenwerte, Hell/Dunkel und mehr). Was möchtest du übernehmen?</p>
+    <p class="help-p">Dieses Backup enthält auch deine App-Einstellungen (Schwellenwerte, Hell/Dunkel, eingeschaltete Messwerte und mehr). Was möchtest du übernehmen?</p>
   </div>
   <div class="dlg-actions col">
     <button class="btn-fill" id="restoreWith" type="button">Werte und Einstellungen übernehmen</button>

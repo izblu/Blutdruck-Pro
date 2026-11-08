@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~680 Z.), `styles.css` (~990 Z.), `vitals.js` (~230 Z.), `app.js` (~2660 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v18`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v19`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 
@@ -92,6 +92,16 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
   `settings.thr` (`tempLow`, `tempY`, `tempR`, `spo2Y`, `spo2G`) zusätzlich zu `sysY/sysR/diaY/diaR`. Die
   Standardwerte sind gängige Richtwerte, die **Fieber-Grenzen sind nicht gegen eine Leitlinie bestätigt**.
 - Sauerstoff über 100 % ist die einzige Sperre; sonst gibt es nur den Prüf-Hinweis „Ungewöhnlicher Wert – bitte prüfen."
+
+### Messwerte ein- und ausschalten (Details in der Vitalwerte-Spezifikation, Abschnitt 13)
+- **Blutdruck und Puls immer an.** Temperatur, Sauerstoff, Gewicht einzeln abwählbar, Standard alle an, unter Menü → „Messwerte".
+  Speicher: `settings.hiddenVitals` (Liste der **ausgeblendeten** Arten, im Backup). Abfrage: `vitalOn`, `activeVitals`, `visibleVitals`
+  (`vitals.js`), `metricOrder`, `capFieldsOf`, `shownThrRows` (`app.js`).
+- **Ausschalten heißt nur ausblenden:** nichts wird gelöscht, keine Rückfrage, wirkt sofort. Ausgeblendet in Erfassen, Dashboard, Verlauf,
+  Diagramm, Zielbereich, Arzt-Report, CSV. **Nicht** in Backup, Backup-Erinnerung, Stand-Zeile „Daten" und „Alle Daten löschen" (`totalCount`).
+- **Abhängig davon:** Umschalter und Wischen (`.metric-seg`, `#capSwitch`, Breite der Markierung über `--n`, bei nur Blutdruck weg), `#plusSheet`,
+  Dashboard-Anordnung (`lastVital`), Report-Schalter und Seitentitel (`reportVitals`), `#csvNote`, Löschen-Rückfrage (`countParts('shown'|'hidden'|'all')`).
+- **Wiederherstellen:** `restoreDone` → `offerSettingsRestore` → `finishRestore`; Zusatzmeldung „Ausgeblendet: …" erst nach der Wahl (`hiddenInFileNote`).
 
 ### Design-Tokens, Dark Mode, Akzentfarben
 - **Design-Tokens** (`:root` in [styles.css](styles.css)): `--bg/--surf/--surf2/--ink/--muted/--line/--accent`,
@@ -121,7 +131,8 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 
 ### Großes + und Erfassen (`#tab-capture`)
 - **Das große + hat drei wählbare Wege** (`settings.plusMode`, Standard **`'c'`**, kommt ins Backup), gewählt unter
-  Menü → Anzeige → „Neue Messung (Plus-Button)". `openPlus()` verzweigt:
+  Menü → Anzeige → „Neue Messung (Plus-Button)". Überall nur eingeschaltete Werte; sind nur Blutdruck und Puls an, startet es sofort die
+  Eingabe und die Wahl ist ausgegraut (`#plusPickNote`). `openPlus()` verzweigt:
   - **A „Erst wählen"**: Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff · Gewicht.
   - **B „Direkt starten"**: Blutdruck, oben ein Umschalter zu Temperatur/Sauerstoff/Gewicht, zusätzlich per Wischen.
   - **C „Alles nacheinander"**: Sys → Dia → Puls → Temperatur → Sauerstoff → Gewicht; Fehlendes wird übersprungen. Jeder Wert
@@ -154,7 +165,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 ### Dashboard (`renderDashboard`, Startseite)
 „Letzte Messung + 7 Tage", alle Werte im selben Aufbau ([dashboard-spezifikation.md](dashboard-spezifikation.md)):
 - **Letzte Messung:** Karten Blutdruck + Puls · Temperatur · Sauerstoff, darunter Gewicht über die ganze Breite (`.dlm-wide`,
-  ohne Ampel), Zahl in Ampelfarbe mit Ampel-Punkt und
+  ohne Ampel; Anordnung passt sich an die eingeschalteten Werte an, siehe Dashboard-Spezifikation 1.1), Zahl in Ampelfarbe mit Ampel-Punkt und
   Ampel-Wort, Zeitpunkt relativ („vor 2 Std.", `relTime`). Antippen → Detail.
 - **Letzte 7 Tage** (rollierend, fest): je Wert nur der **Ø in Ampelfarbe + Wort** (Puls ohne Ampel), **erst ab 3
   Messungen** (`DASH_MIN`), sonst „Zu wenige Messungen" bzw. „Keine Messung in den letzten 7 Tagen". Antippen →
@@ -183,14 +194,14 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 ### Menü (`#menuDlg`, Aussehen A „Verfeinert")
 - **Bottom-Sheet** unten am Bildschirmrand mit Griffleiste, schließt nur bei echtem Tippen auf die Fläche daneben
   (`e.target===dialog`). Nur der Inhalt scrollt, Kopf und „Menü schließen" bleiben fest.
-- **Reihenfolge:** **Backup · Daten · Zielbereich · Anzeige**, darunter die Karten **Anleitung** („10 Themen") und
+- **Reihenfolge:** **Backup · Daten · Messwerte · Zielbereich · Anzeige**, darunter die Karten **Anleitung** („11 Themen") und
   **App installieren** (`#mInstall`, nur im Handy-Browser sichtbar). Immer nur ein Abschnitt offen.
 - **Jeder Abschnitt ist eine eigene Karte** (`--surf`, Rand, Radius 18 px; geöffnet mit Schatten, im Dunklen mit Akzent-Rahmen und Kopfband), Symbol im getönten
   Quadrat, darunter eine **Stand-Zeile**: Backup = Stand in Ampelfarbe (ausgeblendet, solange Backup offen ist),
-  Daten = Anzahl Messungen, Zielbereich = „Standardwerte"/„Eigene Werte", Anzeige = „Auto · Kobalt".
+  Daten = Anzahl Messungen, Messwerte = „Alle Werte an"/„Ohne Gewicht"/„Nur Blutdruck und Puls", Zielbereich = „Standardwerte"/„Eigene Werte", Anzeige = „Auto · Kobalt".
 - Größere Schrift, Blocküberschriften in normaler Schreibweise, Knöpfe mindestens 44–48 px hoch.
-- `openMenu()` frischt alle Stand-Zeilen auf. Wurde der Zielbereich geändert (`_thrChanged`), rechnet beim Schließen
-  `refreshData()` alles neu.
+- `openMenu()` frischt alle Stand-Zeilen auf. Wurden Zielbereich oder Messwerte-Schalter geändert (`_viewsStale`), rechnet beim
+  Schließen `refreshData()` alles neu.
 
 ### Backup (Menü-Abschnitt)
 - **Oben: Stand-Block mit Erinnerung** (`backupState`/`renderBackupState`): grün „Alles gesichert", gelb „Seit N Tagen
@@ -209,10 +220,10 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 - **Hinweis** (Info-Symbol): Backups liegen auf diesem Handy, sicher erst an einem zweiten Ort. Darunter breiter Knopf
   **„Backup teilen"** (Web Share API; klappt das nicht, fragt ein Dialog nach Download).
 - **Format Version 3:** `{app:'blutdruck', version:3, exportedAt, entries, vitals, settings}` (`backupData()`).
-  Gesichert werden nur Vorlieben (`colorDots`, `guideLines`, `theme`, `accent`, `reminderDays`, `thr`, `plusMode`),
-  nicht `firstDirtyAt`/`snoozeUntil`. Ältere Backups (v2, reines Array) bleiben lesbar. Beim Übernehmen der
+  `vitals` enthält immer alle Werte, auch ausgeblendete (kein Platzhalter). Gesichert werden nur Vorlieben (`colorDots`, `guideLines`,
+  `theme`, `accent`, `reminderDays`, `thr`, `plusMode`, `hiddenVitals`), nicht `firstDirtyAt`/`snoozeUntil`. Ältere Backups (v2, reines Array) bleiben lesbar. Beim Übernehmen der
   Einstellungen (`applyBackupSettings`) werden die Grenzen **zusammengeführt** (Backup der alten App ohne neue Grenzen
-  setzt nichts zurück). Zwischen den Apps: Alte → Pro und Pro → Pro alles, Pro → alte App nur Blutdruck und
+  setzt nichts zurück); fehlt `hiddenVitals`, bleiben die aktuellen Schalter. Zwischen den Apps: Alte → Pro und Pro → Pro alles, Pro → alte App nur Blutdruck und
   Einstellungen (Tabelle in der Vitalwerte-Spezifikation, 6.3).
 - **Einstellungen-Rückfrage** (`#restoreDlg`, `offerSettingsRestore()`): enthält ein Backup Einstellungen, „Werte und
   Einstellungen übernehmen" / „Nur die Werte übernehmen" (Raustippen/Esc = nur Werte).
@@ -220,10 +231,11 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 
 ### Daten (Menü-Abschnitt)
 - „Als CSV exportieren (Excel)": Spalten `Datum; Uhrzeit; Systolisch; Diastolisch; Puls; Temperatur (°C); SpO2 (%);
-  Gewicht (kg); Notiz`, Dezimalkomma. Darunter `#csvNote` mit der Anzahl je Wert („42 Blutdruck · 7 Temperatur · 7 Sauerstoff · 5 Gewicht").
+  Gewicht (kg); Notiz`, Dezimalkomma, ausgeblendete Werte fehlen samt Spalte. Darunter `#csvNote` mit der Anzahl je exportiertem Wert
+  („42 Blutdruck · 7 Temperatur · 7 Sauerstoff") und ggf. „Nicht in der CSV, weil ausgeblendet: 5 Gewicht".
 - „Arzt-Report (Drucken/PDF)" (`#mReport`).
-- „Alle Daten löschen" löscht `entries` **und** `vitals`; die Rückfrage zählt alle Werte je Art, Pflicht-Häkchen,
-  Hinweis, dass eine Backup-Datei erhalten bleibt.
+- „Alle Daten löschen" löscht `entries` **und** `vitals`; die Rückfrage zählt alle Werte je Art und markiert „(ausgeblendet)",
+  Pflicht-Häkchen, Hinweis, dass eine Backup-Datei erhalten bleibt. Die Messwerte-Schalter bleiben.
 - Info-Zeile mit der **Speicherbelegung** (sofern der Browser eine Quota liefert).
 
 ### Zielbereich (eigener Menü-Abschnitt)
@@ -231,16 +243,16 @@ Je Wert eine **Ampel-Leiste** mit den Grenzen als Eingabe-Chips an den Übergän
 zusammen **neun Grenzen**. Regel: Jede Zahl gehört zum Bereich rechts davon („ab"). Temperatur mit
 `inputmode="decimal"` (Komma und Punkt), sonst `numeric`. Prüfung (`thrCheck`): Zahlen müssen von links nach rechts
 größer werden – **auch beim Blutdruck** –, Sauerstoff höchstens 100. Fehlermeldung erst bei fertig aussehender Eingabe;
-beim Verlassen eines ungültigen Felds zurück auf den alten Wert + Hinweis-Toast. „Standardwerte wiederherstellen"
-setzt alle neun zurück.
+beim Verlassen eines ungültigen Felds zurück auf den alten Wert + Hinweis-Toast. Leisten ausgeblendeter Werte fehlen (`shownThrRows`),
+Stand-Zeile und „Standardwerte wiederherstellen" betreffen nur sichtbare Grenzen.
 
 ### Anzeige (Menü-Abschnitt)
 „Design" (Hell/Dunkel/Auto mit Symbolen + Akzentfarben-Raster) und „Neue Messung (Plus-Button)" (A/B/C mit
 Mini-Bild, gilt sofort beim Antippen wie die Akzentfarbe).
 
 ### Anleitung (`#helpDlg`)
-**10 Themen zum Aufklappen** (immer nur eins offen, das geöffnete rutscht nach oben; `openHelp`/`closeHelpTopics`),
-Wortlaut vom Nutzer abgestimmt: Werte eintragen · Plus-Button · Dashboard · Farben und Zielbereich · Verlauf und
+**11 Themen zum Aufklappen** (immer nur eins offen, das geöffnete rutscht nach oben; `openHelp`/`closeHelpTopics`),
+Wortlaut vom Nutzer abgestimmt, bleibt für alle gleich und passt sich nicht an die Schalter an: Werte eintragen · Plus-Button · Messwerte ein- und ausschalten · Dashboard · Farben und Zielbereich · Verlauf und
 Diagramm · Backup: nichts verlieren · Wiederherstellen und neues Handy · Daten · Aussehen · App installieren. Der
 Backup-Text sagt richtig, dass Backups erst an einem **zweiten Ort** verlustsicher sind („Backup teilen"), und
 enthält die Android-Warnung. Unten „‹ Zurück" (ins Menü) und „Menü schließen".
@@ -249,8 +261,8 @@ enthält die Android-Warnung. Unten „‹ Zurück" (ins Menü) und „Menü sch
 Aufbereiteter, **druckbarer** A4-Bericht für den Arztbesuch. **Reine Datenaufbereitung, keine Diagnose/Bewertung.**
 Einstiege: Icon im Diagramm-Kopf (`#rpOpenChart`) und Menü → Daten (`#mReport`), beide `openReport()`.
 - **Report-Menü** (Vollbild-Screen `#tab-report`): Zeitraum 30/90/Eigener, Report-Farbe (5 Swatches), Schalter
-  **Namensfeld**, **Puls einbeziehen**, **Temperatur & Sauerstoff einbeziehen**, **Gewicht einbeziehen** (beide Standard an) und
-  **Anhangseite(n) drucken**, verkleinerte Live-Vorschau, Knöpfe **„Drucken"** und **„Als Datei teilen"**. Das Menü
+  **Namensfeld**, **Puls einbeziehen**, **Temperatur einbeziehen**, **Sauerstoff einbeziehen**, **Gewicht einbeziehen** (Standard an, je nur sichtbar, wenn
+  der Wert unter Messwerte an ist) und **Anhangseite(n) drucken**, verkleinerte Live-Vorschau, Knöpfe **„Drucken"** und **„Als Datei teilen"**. Das Menü
   folgt dem App-Theme, die A4-Seiten sind **immer hell**.
 - **Seiten:** Seite 1 „Kompakt" Blutdruck (`rpPage`) · Seite 2 Temperatur, Sauerstoff & Gewicht (`rpVitalPage`, Titel nach Inhalt, entfällt
   ohne Werte im Zeitraum) · Anhang Blutdruck im Querformat (`rpLandscape`) · Anhang Temperatur, Sauerstoff & Gewicht im
@@ -319,6 +331,9 @@ Anleitung, Icon, Installations-Assistent, Arzt-Report-Seiten und iPhone-Feinschl
 - **iPhone** nach der Geräte-Checkliste aus der Abschluss-Sitzung (2026-11-08): Assistent bis zur
   Installation, Start im Flugmodus, Statusleiste/Ränder/Icon hell und dunkel, Backup teilen → wiederherstellen,
   Arzt-Report drucken bzw. „Als Datei teilen" → PDF, Umzug von der alten App, beide Apps parallel.
+- **iPhone, abwählbare Messwerte (eingebaut 2026-11-08, nur im Browser am PC geprüft):** Schalter unter Menü → Messwerte antippen (Tippfläche
+  groß genug?), je ein Wert aus: Dashboard, Umschalter und Wischen in Verlauf/Diagramm, großes + (A/B/C). Alle drei aus: + startet direkt, kein
+  Umschalter, kein Federn. Backup teilen → auf dem iPhone wiederherstellen: Fenstertext und Meldung „Ausgeblendet: …" prüfen.
 - Die Testseite `iphone-test/` wurde am 2026-11-08 auf Wunsch des Nutzers gelöscht (im Git-Verlauf noch vorhanden).
   Die offenen Fragen deshalb an der echten App klären und danach anpassen: Kommt ein in Safari eingetragener Wert in
   der installierten App an? Öffnet „Drucken" im Arzt-Report in der installierten App das Drucken-Fenster? Ob
