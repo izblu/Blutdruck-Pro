@@ -86,6 +86,8 @@ oder drei Stellen hat, und springt danach von selbst zum nächsten Feld.
   am Ende ein früheres Feld, ist „Speichern" gesperrt und der Hinweis nennt, was fehlt.
 - **Datum und Uhrzeit** stehen seit 2026-11-08 links in der Knopfzeile über dem Ziffernblock, damit sie mit dem Daumen
   erreichbar sind. An einem anderen Tag als heute ist das Feld kräftiger markiert.
+- **Notiz** steht seit 2026-11-08 als Feld über die ganze Breite direkt über dem Ziffernblock und zeigt eine vorhandene
+  Notiz einzeilig an.
 
 ---
 
@@ -315,7 +317,7 @@ Checkliste für den Umbau, **alle Punkte umgesetzt**. Bleibt als Nachschlage-Lis
 | `openDB`, `initStorage` | Neuer Store `vitals` (`DB_VER` 2) und Laden von `vitals` |
 | `renderDashboard` | Neu aufgebaut, bricht nur ab, wenn **gar keine** Werte da sind (`totalCount`) |
 | `meanKey`, `trendChip` | Temperatur über `meanMetric`/`fmtMetric` mit Nachkommastelle; `trendChip` entfiel mit dem Trend |
-| `animateDashboard` | Hochzählen nur für ganze Zahlen, die Temperatur bleibt ohne Animation |
+| `animateDashboard` | Hochzählen auch für die Temperatur der letzten Messung (Komma über `fmtMetric`) |
 | `startCapture`, `capUpdate`, `capPressDigit`, `capSkip`, `capSave`, `capPressBack` | Feldliste je Art über `CAP_MODES` |
 | `renderTable`, `renderChart` | Umschalter (`viewMetric`), `getFilteredVitals`, `renderMetricChart`, neue Leerzustände |
 | `renderDetail`, `#detEdit`, `#detDelete` | Suchen über `findRecord` in beiden Listen, `renderVitalDetail` |

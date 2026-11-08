@@ -492,14 +492,19 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 
 /* ================= Erfassen (geführte Eingabe) =================
    Vollbild-Fläche über der App: Kopf · große Vorschauzahl · Segment-Kacheln (Ampel-Rückmeldung) ·
-   Knopfzeile mit Datum, Notiz und Überspringen/Speichern · eigener Ziffernblock.
+   Notiz-Feld · Knopfzeile mit Datum und Überspringen/Speichern · eigener Ziffernblock.
    Bedienung/Logik in app.js (Abschnitt „Erfassen"). */
 .cap{
   position:fixed; inset:0; z-index:40;
   display:flex; flex-direction:column; background:var(--surf);
   padding-top:env(safe-area-inset-top);
   animation:sheetSlide .34s cubic-bezier(.22,.61,.36,1);
+  overflow:hidden;
 }
+.cap,.cap *{touch-action:pan-y pinch-zoom}               /* Waagerechtes Wischen gehört der App, Scrollen und Zwei-Finger-Zoom bleiben frei */
+/* Gleitet beim Wischen; die Kopie der alten Seite liegt während des Wechsels an derselben Stelle (app.js, capSlideTo) */
+.cap-stage{flex:1;min-height:0;display:flex;flex-direction:column}
+.cap-stage-old{position:absolute;left:0;right:0;pointer-events:none}
 .cap-grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 2px;flex:none}
 .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 20px 4px}
 .cap-title{font-size:20px;font-weight:800;letter-spacing:-.02em}
@@ -550,10 +555,14 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 
 .cap-hint{flex:none;min-height:16px;text-align:center;font-size:11.5px;font-weight:700;color:var(--y-ink);padding:1px 16px 0}
 
+.cap-note{flex:none;display:flex;align-items:center;gap:9px;margin:4px 16px 8px;min-height:44px;padding:0 13px;border:1px solid var(--line);border-radius:12px;background:var(--surf2);color:var(--muted);font-size:14px;font-weight:600;text-align:left}
+.cap-note-ic{flex:none;color:var(--accent);display:grid;place-items:center}
+.cap-note-ic svg{width:17px;height:17px;display:block}
+.cap-note-tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cap-note.filled{color:var(--ink)}
+
 .cap-pad{flex:none;background:var(--bg);border-top:1px solid var(--line);padding:8px 10px calc(10px + env(safe-area-inset-bottom))}
 .cap-acc{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 4px 8px}
-.cap-acc-l{display:flex;align-items:center;gap:2px;min-width:0}
-.cap-note-btn{background:none;border:none;color:var(--accent);font-weight:700;font-size:14px;min-height:44px;padding:0 8px;white-space:nowrap}
 .cap-done{min-height:44px;border:none;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:0 22px;font-size:15px;font-weight:800;box-shadow:0 6px 16px -6px rgba(20,30,50,.28);transition:opacity .2s ease}
 .cap-done:disabled{opacity:.5}
 .cap-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
@@ -574,9 +583,11 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .cap-seg.compact .cap-tile-box{padding:9px 2px}
 .cap-seg.compact .cap-tile-val{font-size:17px}
 /* Variante B: Umschalter Blutdruck · Temperatur · Sauerstoff */
-.cap-switch{flex:none;display:flex;gap:4px;margin:8px 16px 0;padding:4px;border-radius:999px;background:var(--surf2)}
-.cap-switch button{flex:1;min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:background-color .2s ease,color .2s ease}
-.cap-switch button.active{background:var(--accent);color:var(--accent-ink)}
+.cap-switch{position:relative;flex:none;display:flex;gap:4px;margin:8px 16px 0;padding:4px;border-radius:999px;background:var(--surf2)}
+.cap-switch-ink{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 16px)/3);border-radius:999px;background:var(--accent);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.cap-switch button{position:relative;flex:1;min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:color .2s ease}
+.cap-switch button.active{color:var(--accent-ink)}
+@media (prefers-reduced-motion:reduce){.cap-switch-ink{transition:none}}
 /* Ampel des aktuellen Felds unter der Zahl; über 100 % rot */
 .cap-cur{min-height:28px;display:flex;align-items:center;justify-content:center}
 .cap-pill.lg{font-size:13px;padding:5px 12px;gap:6px;font-weight:700}
@@ -585,11 +596,15 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .cap-hint.err{color:var(--r-ink)}
 .cap-acc-r{display:flex;align-items:center;gap:4px}
 .cap-skip{background:none;border:none;color:var(--muted);font-weight:800;font-size:13.5px;min-height:44px;padding:0 10px;white-space:nowrap}
-@media (max-width:350px){                                /* sehr schmale Handys: damit auch ein langes Datum in die Knopfzeile passt */
-  .cap-date-ic{display:none}
-  .cap-note-btn{padding:0 4px}
-  .cap-skip{padding:0 6px}
-  .cap-done{padding:0 14px}
+@media (max-height:730px){                               /* niedrige Handys: alles rückt zusammen, damit die große Zahl nicht abgeschnitten wird */
+  .cap-grab{display:none}
+  .cap-mid{padding-top:4px}
+  .cap-center{gap:4px}
+  .cap-big-row{min-height:58px}
+  .cap-big{font-size:64px}
+  .caret{height:54px}
+  .cap-cur{min-height:22px}
+  .cap-key,.cap-key-sp{height:40px}
 }
 
 /* Großes +, Variante A: Auswahl-Blatt */

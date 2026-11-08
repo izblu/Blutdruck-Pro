@@ -268,22 +268,34 @@ const CAT_LABEL={g:'Im Ziel', y:'Erhöht', r:'Zu hoch', n:'–'};
 /* ---------- Wischen zwischen Blutdruck · Temperatur · Sauerstoff ----------
    Für Verlauf, Diagramm und Erfassen (Variante B). Nach links wischen = der Wert rechts daneben, am Ende kein Umlauf.
    Passive Touch-Ereignisse, damit senkrechtes Scrollen ungestört bleibt. Am Bildschirmrand gehört die Geste dem
-   System (Zurück wischen). current() liefert den aktiven Wert oder null, wenn gerade nicht gewischt werden darf. */
+   System (Zurück wischen). current() liefert den aktiven Wert oder null, wenn gerade nicht gewischt werden darf.
+   drag (nur Erfassen): {move(dx,kannWeiter), back()} lässt den Inhalt dem Finger folgen; dann zählt nur die Strecke,
+   nicht die Dauer, und ein zu kurzes Wischen endet mit back(). */
 const METRIC_ORDER=['bp','temp','spo2'];
-function onMetricSwipe(el,current,apply){
+function onMetricSwipe(el,current,apply,drag){
   let s=null;
   el.addEventListener('touchstart',ev=>{
     const t=ev.touches[0];
-    s=ev.touches.length===1&&t.clientX>=24&&t.clientX<=innerWidth-24 ? {x:t.clientX,y:t.clientY,at:ev.timeStamp} : null;
+    s=ev.touches.length===1&&t.clientX>=24&&t.clientX<=innerWidth-24 ? {x:t.clientX,y:t.clientY,at:ev.timeStamp,on:false} : null;
   },{passive:true});
-  el.addEventListener('touchcancel',()=>{ s=null; },{passive:true});
+  if(drag) el.addEventListener('touchmove',ev=>{
+    if(!s) return;
+    const t=ev.touches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
+    if(!s.on){
+      if(Math.abs(dx)<10&&Math.abs(dy)<10) return;
+      s.i=METRIC_ORDER.indexOf(current());
+      if(s.i<0||Math.abs(dx)<1.6*Math.abs(dy)){ s=null; return; }   // senkrecht begonnen: keine Wischgeste
+      s.on=true;
+    }
+    drag.move(dx,!!METRIC_ORDER[s.i+(dx<0?1:-1)]);
+  },{passive:true});
+  el.addEventListener('touchcancel',()=>{ if(s&&s.on) drag.back(); s=null; },{passive:true});
   el.addEventListener('touchend',ev=>{
     if(!s) return;
-    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, ms=ev.timeStamp-s.at; s=null;
-    if(ms>700||Math.abs(dx)<56||Math.abs(dx)<1.6*Math.abs(dy)) return;
-    const i=METRIC_ORDER.indexOf(current()); if(i<0) return;
-    const dir=dx<0?1:-1, next=METRIC_ORDER[i+dir];
-    if(next) apply(next,dir);
+    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, ms=ev.timeStamp-s.at, on=s.on; s=null;
+    const i=METRIC_ORDER.indexOf(current()), dir=dx<0?1:-1, next=i<0?null:METRIC_ORDER[i+dir];
+    if(next&&(on||ms<=700)&&Math.abs(dx)>=56&&Math.abs(dx)>=1.6*Math.abs(dy)) apply(next,dir);
+    else if(on) drag.back();
   },{passive:true});
 }
 /* Kurzes Einschieben aus der Wischrichtung (Klasse räumt sich selbst weg, damit sie spätere Aufbauten nicht beeinflusst). */
@@ -358,6 +370,46 @@ function startCapture(opts,returnTab){
 /* Variante B: oben zwischen Blutdruck, Temperatur und Sauerstoff wechseln (Eingaben je Feld bleiben erhalten). */
 function capSetMode(m){ if(!CAP_MODES[m]||m===cap.mode) return; cap.mode=m; cap.fields=CAP_MODES[m]; cap.step=0; capUpdate(); }
 
+/* Variante B, Bewegung: Beim Wischen folgt der Inhalt dem Finger, die Markierung im Umschalter läuft mit. Beim Loslassen
+   gleitet die alte Seite hinaus und die neue herein; zu kurz gewischt oder am Ende der Reihe federt er zurück.
+   Bei „Bewegung reduzieren" (prefers-reduced-motion) wechselt der Wert sofort. */
+const capStage=$('#capStage'), capSwInk=$('#capSwitchInk'), capCalm=window.matchMedia('(prefers-reduced-motion: reduce)');
+const CAP_SLIDE={duration:280,easing:'cubic-bezier(.22,.61,.36,1)'};
+const capStageFrame=x=>({transform:'translateX('+x+'px)',opacity:1-Math.min(1,Math.abs(x)/innerWidth)*.6});
+let capDragX=0;
+function capSwInkAt(pos){ capSwInk.style.transform='translateX(calc('+pos+' * (100% + 4px)))'; }
+function capDragClear(){
+  capDragX=0; capStage.style.transform=capStage.style.opacity=capSwInk.style.transition='';
+  capSwInkAt(METRIC_ORDER.indexOf(cap.mode));
+}
+function capDragMove(dx,canGo){
+  if(capCalm.matches) return;
+  capDragX=canGo?dx:dx*.25;                                     // am Ende der Reihe gibt der Inhalt nur gummiartig nach
+  Object.assign(capStage.style,capStageFrame(capDragX));
+  capSwInk.style.transition='none';
+  capSwInkAt(METRIC_ORDER.indexOf(cap.mode)-(canGo?dx/innerWidth:0));
+}
+function capDragBack(){
+  const x=capDragX; capDragClear();
+  if(x) capStage.animate([capStageFrame(x),capStageFrame(0)],CAP_SLIDE);
+}
+function capSlideTo(m){
+  const dir=Math.sign(METRIC_ORDER.indexOf(m)-METRIC_ORDER.indexOf(cap.mode));
+  if(!dir) return;
+  if(capCalm.matches){ capSetMode(m); return; }
+  const x=capDragX, w=capStage.offsetWidth;
+  // Eine Kopie der alten Seite gleitet hinaus; der neue Wert steht sofort bereit, Tipps landen also schon richtig.
+  $$('.cap-stage-old').forEach(n=>n.remove());                  // sehr schnelles Wischen: nur die letzte Kopie bleibt
+  const old=capStage.cloneNode(true);
+  [old,...old.querySelectorAll('[id]')].forEach(n=>n.removeAttribute('id'));
+  old.setAttribute('aria-hidden','true'); old.classList.add('cap-stage-old');
+  old.style.top=capStage.offsetTop+'px'; old.style.height=capStage.offsetHeight+'px';
+  capStage.before(old);
+  capDragClear(); capSetMode(m);
+  old.animate([capStageFrame(x),capStageFrame(-dir*w)],CAP_SLIDE).onfinish=()=>old.remove();
+  capStage.animate([capStageFrame(x+dir*w),capStageFrame(0)],CAP_SLIDE);
+}
+
 /* Darf der Puls fehlen? Im Durchgang C und beim Bearbeiten einer Messung, die keinen Puls hatte. */
 const capPulseOptional=()=>cap.mode==='alle'||cap.pulseOptional;
 /* Was beim Speichern entstünde: {recs:[…], err:'', ok}. Systolisch und Diastolisch gehören zusammen. */
@@ -408,6 +460,7 @@ function capUpdate(){
   $('#capUnit').textContent=def.name.toUpperCase()+' · '+def.unit;
   const sw=$('#capSwitch'); sw.hidden=!cap.switcher;
   $$('#capSwitch button').forEach(b=>{ const on=b.dataset.m===cap.mode; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  if(cap.switcher) capSwInkAt(METRIC_ORDER.indexOf(cap.mode));
   $('#capProgress').hidden=!multi; $('#capSeg').hidden=!multi;
   if(multi){
     $$('#capProgress span').forEach(s=>{ const k=+s.dataset.i;
@@ -445,7 +498,9 @@ function capUpdate(){
   // Ein Knopf je Lage: letztes Feld „Speichern", sonst „Überspringen"
   $('#capSkip').hidden=last;
   const done=$('#capDone'); done.hidden=!last; done.disabled=!rec.ok;
-  $('#capNoteBtn').textContent=cap.note.trim()?'✓ Notiz':'+ Notiz';
+  const note=cap.note.trim(), nb=$('#capNoteBtn');
+  $('#capNoteTx').textContent=note||'Notiz hinzufügen'; nb.classList.toggle('filled',!!note);
+  nb.setAttribute('aria-label',note?'Notiz bearbeiten: '+note:'Notiz hinzufügen');
 }
 function capBump(){ const b=$('#capBig'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
 
@@ -571,10 +626,10 @@ $('#capNoteBtn').addEventListener('click',capOpenNote);
 $('#capProgress').addEventListener('click',ev=>{ const s=ev.target.closest('span[data-i]'); if(s) capGoStep(+s.dataset.i); });
 $('#capTiles').addEventListener('click',ev=>{ const t=ev.target.closest('.cap-tile'); if(t) capGoStep(+t.dataset.i); });
 $('#capSkip').addEventListener('click',capSkip);
-$('#capSwitch').addEventListener('click',ev=>{ const b=ev.target.closest('[data-m]'); if(b) capSetMode(b.dataset.m); });
+$('#capSwitch').addEventListener('click',ev=>{ const b=ev.target.closest('[data-m]'); if(b) capSlideTo(b.dataset.m); });
 onMetricSwipe($('#tab-capture'),
   ()=>cap.switcher&&!cap.saving&&$('#capDtSheet').hidden&&$('#capNoteSheet').hidden?cap.mode:null,
-  (m,dir)=>{ capSetMode(m); swipeSlide($('.cap-center'),dir); });
+  capSlideTo,{move:capDragMove,back:capDragBack});
 $('#capDtPanel').addEventListener('click',ev=>{ const b=ev.target.closest('[data-act]'); if(!b||b.disabled) return;
   const a=b.dataset.act;
   if(a==='close') capCloseDt();
@@ -1121,8 +1176,8 @@ const IC_HEART_LINE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const dHead=(icon,t1,t2,pulse)=>'<span class="dhead-l"><span class="dicon'+(pulse?' pulse':'')+'">'+icon+'</span>'
   +'<span class="dhead-tx"><span class="dhead-t1">'+t1+'</span><span class="dhead-t2">'+t2+'</span></span></span>';
 const dWord=(cat,word)=>'<span class="dword" style="color:'+CAT_INK[cat]+'"><span class="ddot" style="background:'+CAT_BAR[cat]+'"></span>'+word+'</span>';
-/* Zahl mit Hochzähl-Markierung (nur ganze Zahlen; die Temperatur bleibt ohne Animation). */
-const dCount=n=>'<span data-count="'+n+'">'+n+'</span>';
+/* Zahl mit Hochzähl-Markierung; mit type wird wie bei diesem Wert formatiert (Temperatur mit Komma). */
+const dCount=(n,type)=>'<span data-count="'+n+'"'+(type?' data-type="'+type+'"':'')+'>'+(type?fmtMetric(type,n):n)+'</span>';
 
 function renderDashboard(){
   const host=$('#dashboard'); if(!host) return;
@@ -1157,7 +1212,7 @@ function renderDashboard(){
     if(!last){ html+='<div class="dcard dlm dlm-none">'+dHead(icSvg(M.icon),M.name,'Noch kein Wert')+'</div>'; return; }
     const k=catMetric(type,last.value);
     html+='<button type="button" class="dcard dlm" data-det="'+last.id+'">'+dHead(icSvg(M.icon),M.name,relTime(last.ts))
-      +'<span class="dlm-val sm tnum" style="color:'+CAT_INK[k.c]+'"><span class="dlm-n">'+(type==='temp'?fmtMetric(type,last.value):dCount(last.value))+'</span><span class="dlm-u"> '+M.unit+'</span></span>'
+      +'<span class="dlm-val sm tnum" style="color:'+CAT_INK[k.c]+'"><span class="dlm-n">'+dCount(last.value,type)+'</span><span class="dlm-u"> '+M.unit+'</span></span>'
       +dWord(k.c,k.t)+'</button>';
   });
   html+='</div>';
@@ -1204,22 +1259,25 @@ $('#dashboard').addEventListener('click',ev=>{
   goMainTab('chart');
 });
 
-/* Dashboard-Einblendung: die großen ganzen Zahlen zählen hoch (Count-up). Läuft bei jedem Öffnen.
+/* Dashboard-Einblendung: die großen Zahlen der letzten Messung zählen hoch (Count-up). Läuft bei jedem Öffnen.
    Respektiert „Bewegung reduzieren" (prefers-reduced-motion) → sofort Endwert. (Der frühere
    Ampel-Ring mit Aufdeck-Animation ist mit dem neuen Dashboard entfallen.) */
 let dashRAF=0;
 function animateDashboard(){
   const host=$('#dashboard'); if(!host) return;
-  const nums=[...host.querySelectorAll('[data-count]')].map(el=>({el,to:+el.dataset.count}));
+  const nums=[...host.querySelectorAll('[data-count]')].map(el=>{
+    const type=el.dataset.type;
+    return {el,to:+el.dataset.count,fmt:type?v=>fmtMetric(type,v):Math.round};
+  });
   const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   cancelAnimationFrame(dashRAF);
-  if(reduce){ nums.forEach(n=>{ n.el.textContent=n.to; }); return; }
-  nums.forEach(n=>{ n.el.textContent='0'; });
+  if(reduce){ nums.forEach(n=>{ n.el.textContent=n.fmt(n.to); }); return; }
+  nums.forEach(n=>{ n.el.textContent=n.fmt(0); });
   const dur=680,t0=performance.now(),ease=p=>1-Math.pow(1-p,3);
   const tick=now=>{
     // Der erste Frame-Zeitstempel kann knapp VOR t0 liegen → nie unter 0 (sonst kurz „-1" statt „0").
     const p=Math.max(0,Math.min(1,(now-t0)/dur)),e=ease(p);
-    nums.forEach(n=>{ n.el.textContent=Math.round(n.to*e); });
+    nums.forEach(n=>{ n.el.textContent=n.fmt(n.to*e); });
     if(p<1) dashRAF=requestAnimationFrame(tick);
   };
   dashRAF=requestAnimationFrame(tick);
