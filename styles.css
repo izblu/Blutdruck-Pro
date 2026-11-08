@@ -659,8 +659,9 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .cap-step-val{font-size:30px;font-weight:800;min-width:48px;text-align:center;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .cap-step-lbl{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.06em}
 .cap-time-colon{font-size:28px;font-weight:800;color:var(--muted);padding-bottom:16px}
-.cap-note-ta{width:100%;min-height:96px;resize:vertical;border:1.5px solid var(--line);border-radius:12px;background:var(--surf2);color:var(--ink);padding:12px;font-size:15px;line-height:1.4;font-family:inherit}
+.cap-note-ta{width:100%;min-height:96px;resize:vertical;border:1.5px solid var(--line);border-radius:12px;background:var(--surf2);color:var(--ink);padding:12px;font-size:16px;line-height:1.4;font-family:inherit}
 .cap-note-ta:focus{outline:none;border-color:var(--accent)}
+#capNoteSheet.kb-open .cap-sheet-panel{padding-bottom:14px}   /* Tastatur offen: Abstand für den iPhone-Balken unten entfällt */
 
 @keyframes sheetSlide{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes scrimIn{from{opacity:0}to{opacity:1}}

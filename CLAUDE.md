@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~660 Z.), `styles.css` (~955 Z.), `vitals.js` (~215 Z.), `app.js` (~2535 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v11`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v12`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 - `iphone-test/`: vorübergehende Testseite für die drei offenen iPhone-Fragen; wird nach den Gerätetests gelöscht
@@ -125,7 +125,8 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   Temperatur immer drei Ziffern, das Komma setzt die App: `368` → 36,8), 0 am Anfang wird ignoriert, vollständig →
   automatisch weiter. Ampel erst bei vollständigem Wert.
 - **Notiz-Feld** (`#capNoteBtn`, Aussehen eines Eingabefelds) über die ganze Breite direkt über dem Ziffernblock, zeigt
-  eine vorhandene Notiz einzeilig an und öffnet das Notiz-Blatt. Bleibt beim Wischen stehen.
+  eine vorhandene Notiz einzeilig an und öffnet das Notiz-Blatt. Bleibt beim Wischen stehen. Das Notiz-Blatt steht dank
+  `capFitNote` (`visualViewport`, `resize` + `scroll`) immer direkt über der Handy-Tastatur.
 - **Knopfzeile über dem Ziffernblock (in Daumen-Reichweite):** links Datum/Uhrzeit (`#capDateChip`, an einem anderen
   Tag als heute kräftiger markiert, `.past`), rechts „Überspringen" (immer genau ein Feld nach rechts, auch bei
   ausgefüllten Feldern, `capSkip`) bzw. auf dem letzten Feld „Speichern" (`#capDone`). Den Knopf „Weiter" gibt es nicht

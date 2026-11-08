@@ -605,8 +605,21 @@ function capRenderDt(){
   $('#capDtPanel').innerHTML=html;
 }
 
-/* ----- Notiz (Bottom-Sheet) ----- */
-function capOpenNote(){ $('#capNoteTa').value=cap.note; navPush('capture','#capNoteSheet'); setTimeout(()=>$('#capNoteTa').focus(),50); }
+/* ----- Notiz (Bottom-Sheet) -----
+   Die Handy-Tastatur verkleinert nur den sichtbaren Bereich (visualViewport), nicht die Seite. Deshalb setzt
+   capFitNote das Blatt selbst direkt über die Tastatur und hält es dort, solange es offen ist.
+   preventScroll: Beim Öffnen fährt das Blatt noch ein, der Browser würde sonst zu einer falschen Stelle rollen. */
+function capFitNote(){
+  const vv=window.visualViewport, sheet=$('#capNoteSheet');
+  if(!vv||sheet.hidden) return;
+  const kb=Math.max(0,Math.round(sheet.clientHeight-vv.height-vv.offsetTop));
+  const panel=$('#capNotePanel');
+  panel.style.bottom=kb+'px';
+  panel.style.maxHeight=Math.floor(vv.height-6)+'px';
+  sheet.classList.toggle('kb-open',kb>80);
+}
+if(window.visualViewport){ visualViewport.addEventListener('resize',capFitNote); visualViewport.addEventListener('scroll',capFitNote); }
+function capOpenNote(){ $('#capNoteTa').value=cap.note; navPush('capture','#capNoteSheet'); capFitNote(); $('#capNoteTa').focus({preventScroll:true}); }
 function capCloseNote(){ closeSheet('#capNoteSheet'); }
 function capApplyNote(){ cap.note=$('#capNoteTa').value; capCloseNote(); capUpdate(); }
 
