@@ -265,6 +265,34 @@ const CAT_SOFT={g:'var(--g-soft)',y:'var(--y-soft)',r:'var(--r-soft)',n:'var(--s
 const CAT_BAR ={g:'var(--g-bar)', y:'var(--y-bar)', r:'var(--r-bar)', n:'var(--muted)'};
 const CAT_LABEL={g:'Im Ziel', y:'Erhöht', r:'Zu hoch', n:'–'};
 
+/* ---------- Wischen zwischen Blutdruck · Temperatur · Sauerstoff ----------
+   Für Verlauf, Diagramm und Erfassen (Variante B). Nach links wischen = der Wert rechts daneben, am Ende kein Umlauf.
+   Passive Touch-Ereignisse, damit senkrechtes Scrollen ungestört bleibt. Am Bildschirmrand gehört die Geste dem
+   System (Zurück wischen). current() liefert den aktiven Wert oder null, wenn gerade nicht gewischt werden darf. */
+const METRIC_ORDER=['bp','temp','spo2'];
+function onMetricSwipe(el,current,apply){
+  let s=null;
+  el.addEventListener('touchstart',ev=>{
+    const t=ev.touches[0];
+    s=ev.touches.length===1&&t.clientX>=24&&t.clientX<=innerWidth-24 ? {x:t.clientX,y:t.clientY,at:ev.timeStamp} : null;
+  },{passive:true});
+  el.addEventListener('touchcancel',()=>{ s=null; },{passive:true});
+  el.addEventListener('touchend',ev=>{
+    if(!s) return;
+    const t=ev.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y, ms=ev.timeStamp-s.at; s=null;
+    if(ms>700||Math.abs(dx)<56||Math.abs(dx)<1.6*Math.abs(dy)) return;
+    const i=METRIC_ORDER.indexOf(current()); if(i<0) return;
+    const dir=dx<0?1:-1, next=METRIC_ORDER[i+dir];
+    if(next) apply(next,dir);
+  },{passive:true});
+}
+/* Kurzes Einschieben aus der Wischrichtung (Klasse räumt sich selbst weg, damit sie spätere Aufbauten nicht beeinflusst). */
+function swipeSlide(el,dir){
+  el.classList.remove('swipe-next','swipe-prev'); void el.offsetWidth;
+  el.onanimationend=ev=>{ if(ev.target===el) el.classList.remove('swipe-next','swipe-prev'); };
+  el.classList.add(dir>0?'swipe-next':'swipe-prev');
+}
+
 /* ---------- Erfassen (geführte Eingabe) ----------
    Ein Feld nach dem anderen über einen eigenen Ziffernblock: große Vorschauzahl, Segment-Kacheln mit
    Ampel-Rückmeldung, Fortschrittsbalken, Datum/Uhrzeit- und Notiz-Sheet. Feldliste je Art (CAP_MODES):
@@ -292,7 +320,11 @@ function capDateLabel(d){
   else day=WD_SHORT[d.getDay()]+', '+d.getDate()+'. '+MO_FULL[d.getMonth()].slice(0,3);
   return day+', '+pad2(d.getHours())+':'+pad2(d.getMinutes());
 }
-function capSyncDateChip(){ $('#capDateLabel').textContent=capDateLabel(cap.date); }
+/* Ein anderer Tag als heute wird deutlicher markiert, damit ein versehentlich geändertes Datum auffällt. */
+function capSyncDateChip(){
+  $('#capDateLabel').textContent=capDateLabel(cap.date);
+  $('#capDateChip').classList.toggle('past',!sameDay(cap.date,new Date()));
+}
 
 /* Öffnen. opts: {mode:'bp'|'temp'|'spo2'|'alle', switcher:true (Variante B)} für eine neue Messung,
    {entry} bzw. {vital} zum Bearbeiten. returnTab = Ziel beim Schließen/Speichern. */
@@ -326,15 +358,8 @@ function startCapture(opts,returnTab){
 /* Variante B: oben zwischen Blutdruck, Temperatur und Sauerstoff wechseln (Eingaben je Feld bleiben erhalten). */
 function capSetMode(m){ if(!CAP_MODES[m]||m===cap.mode) return; cap.mode=m; cap.fields=CAP_MODES[m]; cap.step=0; capUpdate(); }
 
-/* Lässt sich das Feld leer übergehen? Nur im Durchgang C (Sys leer = ganzer Blutdruck übersprungen;
-   Dia nur, wenn Sys leer ist) und beim Bearbeiten einer Messung, die keinen Puls hatte. */
-function capOptional(key){
-  if(cap.mode==='alle'){
-    if(key==='dia') return !(cap.f.sys||'');
-    return true;
-  }
-  return key==='pulse'&&cap.pulseOptional;
-}
+/* Darf der Puls fehlen? Im Durchgang C und beim Bearbeiten einer Messung, die keinen Puls hatte. */
+const capPulseOptional=()=>cap.mode==='alle'||cap.pulseOptional;
 /* Was beim Speichern entstünde: {recs:[…], err:'', ok}. Systolisch und Diastolisch gehören zusammen. */
 function capRecords(){
   const g=k=>cap.f[k]||'', has=k=>cap.fields.includes(k), recs=[]; let err='';
@@ -343,7 +368,7 @@ function capRecords(){
     if(cap.mode!=='alle'||s||d||p){
       if(!rawComplete('sys',s)||!rawComplete('dia',d)) err='Bitte Systolisch und Diastolisch eingeben.';
       else if(p&&!rawComplete('pulse',p)) err='Bitte den Puls vollständig eingeben.';
-      else if(!p&&!capOptional('pulse')) err='Bitte den Puls eingeben.';
+      else if(!p&&!capPulseOptional()) err='Bitte den Puls eingeben.';
       else recs.push({kind:'bp',sys:rawValue('sys',s),dia:rawValue('dia',d),pulse:p?rawValue('pulse',p):null});
     }
   }
@@ -410,17 +435,16 @@ function capUpdate(){
   // Ampel des aktuellen Felds unter der großen Zahl – erst, wenn der Wert vollständig ist
   const cc=capFieldCat(key,raw), cp=$('#capPill');
   cp.innerHTML=cc&&cc.c!=='n'?'<span class="cap-pill lg" style="background:'+CAT_SOFT[cc.c]+';color:'+CAT_INK[cc.c]+'"><span class="d" style="background:'+CAT_BAR[cc.c]+'"></span>'+cc.t+'</span>':'';
-  // Hinweis: Sperre (über 100 %) > Prüf-Hinweis > (Durchgang C, letzter Schritt) was noch fehlt
+  // Hinweis: Sperre (über 100 %) > Prüf-Hinweis > (letzter Schritt) was noch fehlt, außer es fehlt nur das gerade offene Feld
   const rec=capRecords();
   let hint='', err=false;
   if(cap.fields.some(k=>spo2Over(k,cap.f[k]||''))){ hint='Über 100 % ist nicht möglich.'; err=true; }
   else if(cap.fields.some(k=>capFieldOdd(k,cap.f[k]||''))) hint='Ungewöhnlicher Wert – bitte prüfen.';
-  else if(cap.mode==='alle'&&last&&!rec.ok){ hint=rec.err; }
+  else if(last&&!rec.ok&&(cap.mode==='alle'||cap.fields.slice(0,-1).some(k=>!rawComplete(k,cap.f[k]||'')))) hint=rec.err;
   const h=$('#capHint'); h.textContent=hint; h.classList.toggle('err',err);
-  const next=$('#capNext');
-  next.textContent=last?'Speichern':'Weiter';
-  next.disabled=last?!rec.ok:!(rawComplete(key,raw)&&!spo2Over(key,raw));
-  $('#capSkip').hidden=last||raw.length>0||!capOptional(key);
+  // Ein Knopf je Lage: letztes Feld „Speichern", sonst „Überspringen"
+  $('#capSkip').hidden=last;
+  const done=$('#capDone'); done.hidden=!last; done.disabled=!rec.ok;
   $('#capNoteBtn').textContent=cap.note.trim()?'✓ Notiz':'+ Notiz';
 }
 function capBump(){ const b=$('#capBig'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
@@ -440,18 +464,8 @@ function capPressBack(){
   if(cap.step>0){ cap.step--; capUpdate(); }
 }
 function capGoStep(i){ if(i!==cap.step&&i>=0&&i<cap.fields.length){ cap.step=i; capUpdate(); } }
-function capNext(){
-  const key=cap.fields[cap.step], raw=cap.f[key]||'';
-  if(cap.step<cap.fields.length-1){ if(!rawComplete(key,raw)||spo2Over(key,raw)) return; cap.step++; capUpdate(); }
-  else capSave();
-}
-/* Überspringen (nur bei leeren, optionalen Feldern): leere Systolisch-Eingabe in C überspringt den ganzen Blutdruck. */
-function capSkip(){
-  const key=cap.fields[cap.step];
-  if(cap.mode==='alle'&&key==='sys') cap.step=cap.fields.indexOf('temp');
-  else cap.step=Math.min(cap.step+1,cap.fields.length-1);
-  capUpdate();
-}
+/* Überspringen: immer genau ein Feld nach rechts. Auf dem letzten Feld steht stattdessen „Speichern". */
+function capSkip(){ if(cap.step<cap.fields.length-1){ cap.step++; capUpdate(); } }
 function capClose(){ if(!cap.saving) backToScreen(cap.returnTab); }
 function capSave(){
   if(cap.saving) return;
@@ -550,7 +564,7 @@ function capApplyNote(){ cap.note=$('#capNoteTa').value; capCloseNote(); capUpda
 /* ----- Verkabelung ----- */
 $('#capKeys').addEventListener('click',ev=>{ const b=ev.target.closest('.cap-key'); if(!b) return;
   const k=b.dataset.k; if(k==='back') capPressBack(); else capPressDigit(k); });
-$('#capNext').addEventListener('click',capNext);
+$('#capDone').addEventListener('click',capSave);
 $('#capClose').addEventListener('click',capClose);
 $('#capDateChip').addEventListener('click',capOpenDt);
 $('#capNoteBtn').addEventListener('click',capOpenNote);
@@ -558,6 +572,9 @@ $('#capProgress').addEventListener('click',ev=>{ const s=ev.target.closest('span
 $('#capTiles').addEventListener('click',ev=>{ const t=ev.target.closest('.cap-tile'); if(t) capGoStep(+t.dataset.i); });
 $('#capSkip').addEventListener('click',capSkip);
 $('#capSwitch').addEventListener('click',ev=>{ const b=ev.target.closest('[data-m]'); if(b) capSetMode(b.dataset.m); });
+onMetricSwipe($('#tab-capture'),
+  ()=>cap.switcher&&!cap.saving&&$('#capDtSheet').hidden&&$('#capNoteSheet').hidden?cap.mode:null,
+  (m,dir)=>{ capSetMode(m); swipeSlide($('.cap-center'),dir); });
 $('#capDtPanel').addEventListener('click',ev=>{ const b=ev.target.closest('[data-act]'); if(!b||b.disabled) return;
   const a=b.dataset.act;
   if(a==='close') capCloseDt();
@@ -579,7 +596,7 @@ document.addEventListener('keydown',ev=>{
   if(dtOpen||noteOpen){ if(ev.key==='Escape'){ capCloseDt(); capCloseNote(); } return; }
   if(ev.key>='0'&&ev.key<='9'){ capPressDigit(ev.key); ev.preventDefault(); }
   else if(ev.key==='Backspace'){ capPressBack(); ev.preventDefault(); }
-  else if(ev.key==='Enter'){ if(!$('#capNext').disabled) capNext(); ev.preventDefault(); }
+  else if(ev.key==='Enter'){ if(cap.step<cap.fields.length-1) capSkip(); else capSave(); ev.preventDefault(); }
   else if(ev.key==='Escape'){ capClose(); }
 });
 
@@ -655,11 +672,16 @@ function renderTable(){
   if(currentTab==='table') requestAnimationFrame(positionVInk);
 }
 /* Umschalter Blutdruck · Temperatur · Sauerstoff (je einer in Verlauf und Diagramm, gleicher Zustand). */
-document.addEventListener('click',ev=>{
-  const b=ev.target.closest('.metric-seg button[data-metric]'); if(!b||b.dataset.metric===viewMetric) return;
-  viewMetric=b.dataset.metric;
+function setViewMetric(m){
+  if(m===viewMetric) return;
+  viewMetric=m;
   if(currentTab==='chart'){ closeDgPop(); renderChart(); } else renderTable();
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('.metric-seg button[data-metric]'); if(b) setViewMetric(b.dataset.metric);
 });
+[['#tab-table','.vh-scroll'],['#tab-chart','#dgBody']].forEach(([screen,body])=>
+  onMetricSwipe($(screen),()=>viewMetric,(m,dir)=>{ setViewMetric(m); swipeSlide($(body),dir); }));
 /* Gleitende Markierung unter die aktive Zeitraum-Pille legen (misst deren Position). */
 function positionVInk(){
   const bar=$('#vFilter'); if(!bar) return;
@@ -1142,11 +1164,11 @@ function renderDashboard(){
 
   /* --- Letzte 7 Tage: Ø erst ab 3 Messungen, Ampelfarbe + Wort auf dem gerundeten Ø --- */
   html+='<h2 class="dsec">Letzte 7 Tage</h2>';
-  const avgBlock=(n,valHtml,cat,word)=>{
-    if(!n) return '<span class="dst-empty"><b>Keine Messung</b><span>in den letzten 7 Tagen</span></span>';
-    if(n<DASH_MIN) return '<span class="dst-empty"><b>Zu wenige Messungen</b><span>Ø erst ab '+DASH_MIN+' Messungen</span></span>';
-    return '<span class="dst-avg" style="color:'+CAT_INK[cat]+'"><span class="dst-v tnum">'+valHtml+'</span>'+dWord(cat,word)+'</span>';
-  };
+  const emptyBlock=n=>n
+    ? '<span class="dst-empty"><b>Zu wenige Messungen</b><span>Ø erst ab '+DASH_MIN+' Messungen</span></span>'
+    : '<span class="dst-empty"><b>Keine Messung</b><span>in den letzten 7 Tagen</span></span>';
+  const avgBlock=(n,valHtml,cat,word)=>n<DASH_MIN ? emptyBlock(n)
+    : '<span class="dst-avg" style="color:'+CAT_INK[cat]+'"><span class="dst-v tnum">'+valHtml+'</span>'+dWord(cat,word)+'</span>';
   // Blutdruck mit Puls-Zeile
   const bp7=entries.filter(e=>ageDays(e.ts)<=7);
   const s7=meanKey(bp7,'sys'), d7=meanKey(bp7,'dia'), p7list=bp7.filter(e=>Number.isFinite(e.pulse)), p7=meanKey(p7list,'pulse');
@@ -1158,7 +1180,7 @@ function renderDashboard(){
     html+='<span class="dst-top dst-pulse">'+dHead(IC_HEART_LINE,'Puls','Ø 7 Tage · bpm',true)
       +(p7list.length>=DASH_MIN
         ? '<span class="dst-avg" style="color:var(--pulse-ink)"><span class="dst-v tnum"><span class="dst-o">Ø </span><span class="dst-n">'+p7+'</span><span class="dst-u"> bpm</span></span></span>'
-        : '<span class="dst-empty"><b>Zu wenige Messungen</b></span>')
+        : emptyBlock(p7list.length))
       +'</span>';
   }
   html+='</button>';

@@ -71,7 +71,7 @@ der alten App und von File-Compressor räumen fremde Caches weg – harmlos, Pro
 ### Code-Struktur
 - `index.html` (~660 Z.), `styles.css` (~955 Z.), `vitals.js` (~215 Z.), `app.js` (~2535 Z.), `sw.js`.
   Eingebunden per `<link rel="stylesheet">` und `<script defer>` – **`vitals.js` vor `app.js`**.
-- `sw.js`: Cache **`blutdruck-pro-v7`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
+- `sw.js`: Cache **`blutdruck-pro-v8`**, network-first, `fetch` revalidiert per `cache:'no-cache'` (sonst kann ein
   Update alte Dateien mischen). Cacht alle Dateien inkl. Icons und `fonts/hanken-grotesk.woff2`. **Bei jeder
   Änderung an App-Dateien die Cache-Version erhöhen.**
 - `iphone-test/`: vorübergehende Testseite für die drei offenen iPhone-Fragen; wird nach den Gerätetests gelöscht
@@ -114,7 +114,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 - **Das große + hat drei wählbare Wege** (`settings.plusMode`, Standard **`'c'`**, kommt ins Backup), gewählt unter
   Menü → Anzeige → „Neue Messung (Plus-Button)". `openPlus()` verzweigt:
   - **A „Erst wählen"**: Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff.
-  - **B „Direkt starten"**: Blutdruck, oben ein Umschalter zu Temperatur/Sauerstoff.
+  - **B „Direkt starten"**: Blutdruck, oben ein Umschalter zu Temperatur/Sauerstoff, zusätzlich per Wischen.
   - **C „Alles nacheinander"**: Sys → Dia → Puls → Temperatur → Sauerstoff; Fehlendes wird übersprungen. Jeder Wert
     wird ein eigener Datensatz mit gleichem `ts`, die Notiz wird in alle kopiert. Puls lässt sich überspringen
     (`pulse:null`, alle Puls-Stellen kommen damit klar).
@@ -124,6 +124,14 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
 - **Ziffern-Logik:** erkennt 2 oder 3 Stellen selbst (Sys mit 1/2 am Anfang dreistellig, Dia/Puls/SpO₂ mit 1,
   Temperatur immer drei Ziffern, das Komma setzt die App: `368` → 36,8), 0 am Anfang wird ignoriert, vollständig →
   automatisch weiter. Ampel erst bei vollständigem Wert.
+- **Knopfzeile über dem Ziffernblock (in Daumen-Reichweite):** links Datum/Uhrzeit (`#capDateChip`, an einem anderen
+  Tag als heute kräftiger markiert, `.past`) und „+ Notiz", rechts „Überspringen" (immer genau ein Feld nach rechts,
+  auch bei ausgefüllten Feldern, `capSkip`) bzw. auf dem letzten Feld „Speichern" (`#capDone`). Den Knopf „Weiter" gibt
+  es nicht mehr. Fehlt am Ende etwas Früheres, sagt der Hinweis über dem Ziffernblock, was. Unter 350 px Breite rückt
+  die Zeile enger zusammen, damit auch ein langes Datum passt.
+- **Wischen** (`onMetricSwipe`, `swipeSlide`): nach links = Wert rechts daneben, kein Umlauf, gilt in Verlauf, Diagramm
+  und Erfassen Variante B. Passive Touch-Ereignisse, also bleibt senkrechtes Scrollen frei; am Bildschirmrand (24 px)
+  gehört die Geste dem System.
 
 ### Dashboard (`renderDashboard`, Startseite)
 „Letzte Messung + 7 Tage", alle vier Werte im selben Aufbau ([dashboard-spezifikation.md](dashboard-spezifikation.md)):
@@ -138,7 +146,7 @@ Feste Tab-Bar unten **Dashboard · Verlauf · [ + ] · Diagramm · Menü** mit z
   Karten blenden gestaffelt ein. Alles hinter `prefers-reduced-motion`.
 
 ### Verlauf, Detail und Diagramm
-- **Umschalter** Blutdruck · Temperatur · Sauerstoff (`.metric-seg`, Zustand `viewMetric`, flüchtig) und
+- **Umschalter** Blutdruck · Temperatur · Sauerstoff (`.metric-seg` oder Wischen, Zustand `viewMetric`, flüchtig) und
   **gemeinsamer Zeitraum** 7/30/90 + Von–Bis (`applyVerlaufRange`, `filters.from/to`) gelten für Verlauf **und**
   Diagramm.
 - **Verlauf** (`renderTable`, Screen-Id bleibt `#tab-table`): neueste zuerst, Werte in Ampelfarbe (Blutdruck per Wert
@@ -287,7 +295,8 @@ Anleitung, Icon, Installations-Assistent, Arzt-Report-Seiten und iPhone-Feinschl
 *Legende — Aufwand: klein / mittel / groß · Machbarkeit: problemlos / mit Hürde / heikel.*
 
 ### 1. Gerätetests (macht der Nutzer, Claude hat kein iPhone)
-- **iPhone und Android** nach der Geräte-Checkliste aus der Abschluss-Sitzung (2026-11-08): Assistent bis zur
+- **Android ist abgeschlossen (2026-11-08), das iPhone steht noch aus.**
+- **iPhone** nach der Geräte-Checkliste aus der Abschluss-Sitzung (2026-11-08): Assistent bis zur
   Installation, Start im Flugmodus, Statusleiste/Ränder/Icon hell und dunkel, Backup teilen → wiederherstellen,
   Arzt-Report drucken bzw. „Als Datei teilen" → PDF, Umzug von der alten App, beide Apps parallel.
 - Dabei die drei offenen Fragen klären (Teilen-Menü, Safari-Daten in der App, `window.print` in der App) und

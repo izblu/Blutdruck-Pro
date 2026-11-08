@@ -51,14 +51,7 @@
       <div class="cap-grab"></div>
 
       <div class="cap-head">
-        <div class="cap-head-l">
-          <div class="cap-title" id="capTitle">Neue Messung</div>
-          <button class="cap-date" id="capDateChip" type="button">
-            <span class="cap-date-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17"/><path d="M8 3v3.5M16 3v3.5"/></svg></span>
-            <span id="capDateLabel">Jetzt</span>
-            <svg class="cap-date-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-        </div>
+        <div class="cap-title" id="capTitle">Neue Messung</div>
         <button class="cap-x" id="capClose" type="button" aria-label="Abbrechen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
@@ -90,10 +83,16 @@
 
       <div class="cap-pad">
         <div class="cap-acc">
-          <button class="cap-note-btn" id="capNoteBtn" type="button">+ Notiz</button>
+          <div class="cap-acc-l">
+            <button class="cap-date" id="capDateChip" type="button">
+              <span class="cap-date-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17"/><path d="M8 3v3.5M16 3v3.5"/></svg></span>
+              <span id="capDateLabel">Jetzt</span>
+            </button>
+            <button class="cap-note-btn" id="capNoteBtn" type="button">+ Notiz</button>
+          </div>
           <div class="cap-acc-r">
-            <button class="cap-skip" id="capSkip" type="button" hidden>Überspringen</button>
-            <button class="cap-next" id="capNext" type="button">Weiter</button>
+            <button class="cap-skip" id="capSkip" type="button">Überspringen</button>
+            <button class="cap-done" id="capDone" type="button" hidden>Speichern</button>
           </div>
         </div>
         <div class="cap-keys" id="capKeys">
@@ -489,7 +488,8 @@
         <p class="hlp-pt">Blutdruck: Systolisch, Diastolisch und Puls nacheinander.</p>
         <p class="hlp-pt">Temperatur: drei Ziffern, das Komma setzt die App. Aus 368 wird 36,8 °C.</p>
         <p class="hlp-pt">Sauerstoff: zwei oder drei Ziffern, höchstens 100 %.</p>
-        <p>Datum und Uhrzeit stehen auf „Jetzt“, du kannst sie antippen und ändern. Eine Notiz (z. B. „nach dem Sport“) ist freiwillig.</p>
+        <p>Ist ein Wert vollständig, springt die App von selbst zum nächsten. Mit „Überspringen“ gehst du ohne Eingabe ein Feld weiter, im letzten Feld tippst du auf „Speichern“.</p>
+        <p>Datum und Uhrzeit stehen links über dem Ziffernblock und sind auf jetzt eingestellt. Zum Ändern tippst du darauf. Eine Notiz (z. B. „nach dem Sport“) ist freiwillig.</p>
       </div>
     </div>
     <div class="hlp">
@@ -501,7 +501,7 @@
       <div class="hlp-body" id="hlp2" hidden>
         <p>Was das große + macht, legst du unter Menü → „Anzeige“ → „Neue Messung (Plus-Button)“ fest.</p>
         <p class="hlp-pt">„Erst wählen“ fragt zuerst, was du messen möchtest.</p>
-        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck, oben wechselst du zu Temperatur oder Sauerstoff.</p>
+        <p class="hlp-pt">„Direkt starten“ beginnt mit dem Blutdruck. Zu Temperatur oder Sauerstoff wechselst du oben oder durch Wischen nach links und rechts.</p>
         <p class="hlp-pt">„Alles nacheinander“ (Standard) führt dich durch alle Werte; was du nicht gemessen hast, überspringst du. Eine Notiz gilt dann für alle Werte dieses Durchgangs.</p>
       </div>
     </div>
@@ -537,7 +537,7 @@
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="hlp-body" id="hlp5" hidden>
-        <p>Oben wählst du Blutdruck, Temperatur oder Sauerstoff und den Zeitraum: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
+        <p>Blutdruck, Temperatur oder Sauerstoff wählst du oben oder durch Wischen nach links und rechts. Unten stellst du den Zeitraum ein: 7, 30 oder 90 Tage oder eigene Daten. Beides gilt für Verlauf und Diagramm gemeinsam.</p>
         <p class="hlp-pt">Verlauf: alle Messungen, neueste zuerst. Tippe eine an, um sie anzusehen, zu bearbeiten oder zu löschen.</p>
         <p class="hlp-pt">Diagramm: deine Werte über die Zeit. Die Punkte haben die Ampel-Farbe, die gestrichelte Linie ist der Durchschnitt. Beim Blutdruck schaltest du zwischen Sys, Dia und Beide um und blendest den Puls ein.</p>
       </div>

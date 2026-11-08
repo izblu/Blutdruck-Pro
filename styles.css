@@ -491,8 +491,9 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){#dashboard>*{animation:none}}
 
 /* ================= Erfassen (geführte Eingabe) =================
-   Vollbild-Fläche über der App: Kopf mit Datum-Chip · große Vorschauzahl · Segment-Kacheln
-   (Ampel-Rückmeldung) · eigener Ziffernblock. Bedienung/Logik in app.js (Abschnitt „Erfassen"). */
+   Vollbild-Fläche über der App: Kopf · große Vorschauzahl · Segment-Kacheln (Ampel-Rückmeldung) ·
+   Knopfzeile mit Datum, Notiz und Überspringen/Speichern · eigener Ziffernblock.
+   Bedienung/Logik in app.js (Abschnitt „Erfassen"). */
 .cap{
   position:fixed; inset:0; z-index:40;
   display:flex; flex-direction:column; background:var(--surf);
@@ -500,18 +501,18 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
   animation:sheetSlide .34s cubic-bezier(.22,.61,.36,1);
 }
 .cap-grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 2px;flex:none}
-.cap-head{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:8px 20px 4px}
-.cap-head-l{display:flex;flex-direction:column;gap:7px;min-width:0}
+.cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 20px 4px}
 .cap-title{font-size:20px;font-weight:800;letter-spacing:-.02em}
 .cap-date{
-  display:inline-flex;align-items:center;gap:7px;align-self:flex-start;
+  position:relative;flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
   background:color-mix(in srgb,var(--accent) 9%,var(--surf2));
   border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));
-  color:var(--ink);border-radius:999px;padding:6px 8px 6px 11px;font-size:13px;font-weight:700;
+  color:var(--ink);border-radius:999px;padding:6px 11px;font-size:13px;font-weight:700;
 }
+.cap-date::after{content:'';position:absolute;inset:-8px -2px}          /* Tippfläche 44 px hoch, ohne dass der Chip größer aussieht */
+.cap-date.past{background:color-mix(in srgb,var(--accent) 18%,var(--surf));border-color:var(--accent)}
 .cap-date-ic{color:var(--accent);display:grid;place-items:center}
 .cap-date-ic svg{width:15px;height:15px;display:block}
-.cap-date-chev{width:15px;height:15px;opacity:.5}
 .cap-x{width:34px;height:34px;flex:none;border:none;border-radius:50%;background:var(--surf2);color:var(--muted);display:grid;place-items:center}
 .cap-x svg{width:18px;height:18px}
 
@@ -550,10 +551,11 @@ button.dcard:active{transform:scale(.985);background:var(--surf2)}
 .cap-hint{flex:none;min-height:16px;text-align:center;font-size:11.5px;font-weight:700;color:var(--y-ink);padding:1px 16px 0}
 
 .cap-pad{flex:none;background:var(--bg);border-top:1px solid var(--line);padding:8px 10px calc(10px + env(safe-area-inset-bottom))}
-.cap-acc{display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px}
-.cap-note-btn{background:none;border:none;color:var(--accent);font-weight:700;font-size:14px;padding:4px}
-.cap-next{border:none;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:10px 22px;font-size:15px;font-weight:800;box-shadow:0 6px 16px -6px rgba(20,30,50,.28);transition:opacity .2s ease}
-.cap-next:disabled{opacity:.5}
+.cap-acc{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 4px 8px}
+.cap-acc-l{display:flex;align-items:center;gap:2px;min-width:0}
+.cap-note-btn{background:none;border:none;color:var(--accent);font-weight:700;font-size:14px;min-height:44px;padding:0 8px;white-space:nowrap}
+.cap-done{min-height:44px;border:none;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:0 22px;font-size:15px;font-weight:800;box-shadow:0 6px 16px -6px rgba(20,30,50,.28);transition:opacity .2s ease}
+.cap-done:disabled{opacity:.5}
 .cap-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .cap-key{height:46px;border:none;border-radius:10px;background:var(--surf);color:var(--ink);display:grid;place-items:center;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;box-shadow:0 1px 1.5px rgba(20,30,50,.16);transition:transform .11s ease}
 .cap-key:active{transform:scale(.94)}
@@ -582,7 +584,13 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .cap-big.over{color:var(--r-ink)}
 .cap-hint.err{color:var(--r-ink)}
 .cap-acc-r{display:flex;align-items:center;gap:4px}
-.cap-skip{background:none;border:none;color:var(--muted);font-weight:800;font-size:13.5px;min-height:44px;padding:0 10px}
+.cap-skip{background:none;border:none;color:var(--muted);font-weight:800;font-size:13.5px;min-height:44px;padding:0 10px;white-space:nowrap}
+@media (max-width:350px){                                /* sehr schmale Handys: damit auch ein langes Datum in die Knopfzeile passt */
+  .cap-date-ic{display:none}
+  .cap-note-btn{padding:0 4px}
+  .cap-skip{padding:0 6px}
+  .cap-done{padding:0 14px}
+}
 
 /* Großes +, Variante A: Auswahl-Blatt */
 .plus-panel{display:flex;flex-direction:column;gap:8px}
@@ -689,6 +697,12 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 .metric-seg{flex:none;display:flex;gap:4px;margin:2px 16px 6px;padding:3px;border-radius:999px;background:var(--surf2);border:1px solid var(--line)}
 .metric-seg button{flex:1;min-height:40px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:800;transition:background-color .2s ease,color .2s ease}
 .metric-seg button.active{background:var(--surf);color:var(--accent);box-shadow:0 1px 3px rgba(20,30,50,.14)}
+/* Beim Wischen schiebt sich der Inhalt aus der Wischrichtung herein (Klasse setzt swipeSlide). */
+.swipe-next{animation:swipeNext .22s ease-out}
+.swipe-prev{animation:swipePrev .22s ease-out}
+.swipe-next .vrow,.swipe-prev .vrow{animation:none}
+@keyframes swipeNext{from{opacity:.2;transform:translateX(40px)}}
+@keyframes swipePrev{from{opacity:.2;transform:translateX(-40px)}}
 .vh-c-m{text-align:right}
 .vrow-m{text-align:right;font-size:15px;font-weight:800;white-space:nowrap}
 
@@ -874,6 +888,7 @@ button.cap-tile{border:none;background:none;padding:0;margin:0;font:inherit;colo
 @media (prefers-reduced-motion:reduce){
   #tab-table.screen.active,#tab-detail.screen.active,#tab-chart.screen.active{animation:none}
   .vrow{animation:none!important}
+  .swipe-next,.swipe-prev{animation:none}
   .det-scale-mk,.sheet-panel,.sheet-scrim,.dg-chart,.dg-pop{animation:none}
   .det-nav:active,.det-primary:active,.det-del:active{transform:none}
   .dg-line,.dg-pt{animation:none;stroke-dashoffset:0}

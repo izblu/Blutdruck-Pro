@@ -65,7 +65,7 @@ Temperatur und Sauerstoff haben je **ein Feld**. Gespeichert wird immer erst per
 ### 1.1 Ziffern-Logik (alle Werte, auch Blutdruck)
 
 Wunsch des Nutzers (Kommentar auf der Zeichenfläche, 2026-11-06). Der Ziffernblock erkennt selbst, ob ein Wert zwei
-oder drei Stellen hat, und springt danach ohne Tippen auf „Weiter" zum nächsten Feld.
+oder drei Stellen hat, und springt danach von selbst zum nächsten Feld.
 
 | Feld | Drei Stellen, wenn die erste Ziffer … | sonst | Prüf-Hinweis außerhalb von |
 |---|---|---|---|
@@ -81,6 +81,11 @@ oder drei Stellen hat, und springt danach ohne Tippen auf „Weiter" zum nächst
 - **Ampel erst bei vollständigem Wert.** Vorher (z. B. bei „1") steht weder Farbe noch Ampel-Wort da.
 - **Der Prüf-Hinweis sperrt nichts** (einzige Sperre bleibt Sauerstoff über 100 %).
 - Gilt auch für den bisherigen Blutdruck: `capPressDigit` sprang früher erst nach drei Ziffern weiter.
+- **Überspringen** führt auf jedem Feld außer dem letzten genau ein Feld nach rechts, auch über Pflichtfelder hinweg.
+  Auf dem letzten Feld steht stattdessen „Speichern". Einen Knopf „Weiter" gibt es seit 2026-11-08 nicht mehr. Fehlt
+  am Ende ein früheres Feld, ist „Speichern" gesperrt und der Hinweis nennt, was fehlt.
+- **Datum und Uhrzeit** stehen seit 2026-11-08 links in der Knopfzeile über dem Ziffernblock, damit sie mit dem Daumen
+  erreichbar sind. An einem anderen Tag als heute ist das Feld kräftiger markiert.
 
 ---
 
@@ -286,7 +291,7 @@ Schlüssel nicht und übernimmt ihn einfach nicht.
 | | Name im Menü | Satz im Menü | Ablauf |
 |---|---|---|---|
 | A | Erst wählen | „Nach dem + wählst du, was du misst." | Auswahl-Blatt `#plusSheet` Blutdruck · Temperatur · Sauerstoff, danach die Eingabe |
-| B | Direkt starten | „Startet mit Blutdruck. Oben wechselst du den Wert." | Eingabe Blutdruck, oben ein Umschalter zu Temperatur und Sauerstoff |
+| B | Direkt starten | „Startet mit Blutdruck. Oben wechselst du den Wert." | Eingabe Blutdruck, oben ein Umschalter zu Temperatur und Sauerstoff, zusätzlich per Wischen |
 | C | Alles nacheinander | „Alle Werte in einem Durchgang. Was fehlt, überspringst du." + Pille „Standard" | Sys → Dia → Puls → Temperatur → Sauerstoff, was fehlt, wird übersprungen |
 
 Jede Wahlzeile zeigt ein kleines Bild des Bildschirms, Name, Satz und rechts den Häkchen-Kreis. Das große + ruft
@@ -311,7 +316,7 @@ Checkliste für den Umbau, **alle Punkte umgesetzt**. Bleibt als Nachschlage-Lis
 | `renderDashboard` | Neu aufgebaut, bricht nur ab, wenn **gar keine** Werte da sind (`totalCount`) |
 | `meanKey`, `trendChip` | Temperatur über `meanMetric`/`fmtMetric` mit Nachkommastelle; `trendChip` entfiel mit dem Trend |
 | `animateDashboard` | Hochzählen nur für ganze Zahlen, die Temperatur bleibt ohne Animation |
-| `startCapture`, `capUpdate`, `capPressDigit`, `capNext`, `capSave`, `capPressBack` | Feldliste je Art über `CAP_MODES` |
+| `startCapture`, `capUpdate`, `capPressDigit`, `capSkip`, `capSave`, `capPressBack` | Feldliste je Art über `CAP_MODES` |
 | `renderTable`, `renderChart` | Umschalter (`viewMetric`), `getFilteredVitals`, `renderMetricChart`, neue Leerzustände |
 | `renderDetail`, `#detEdit`, `#detDelete` | Suchen über `findRecord` in beiden Listen, `renderVitalDetail` |
 | `exportCSV`, `exportJSON`, `shareBackup` | „Noch keine Werte" nur, wenn beide Listen leer sind (`totalCount`) |
